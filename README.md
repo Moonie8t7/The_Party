@@ -48,10 +48,14 @@ graph TD
     Chain --> Claude[Claude API]
     Chain --> GPT[OpenAI API]
     Chain --> Gemini[Gemini API]
+    Chain --> Grok[Grok API]
+    Chain --> DeepSeek[DeepSeek API]
     
     Claude --> Repair(Length Enforcement)
     GPT --> Repair
     Gemini --> Repair
+    Grok --> Repair
+    DeepSeek --> Repair
     
     Repair --> TTS(ElevenLabs Pipelining)
     TTS --> OBSOut[OBS Browser UI]
