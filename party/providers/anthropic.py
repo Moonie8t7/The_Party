@@ -28,7 +28,7 @@ class AnthropicProvider(BaseProvider):
                 None,
                 lambda: self.client.messages.create(
                     model=character.model_id,
-                    max_tokens=300,
+                    max_tokens=600,
                     system=full_prompt,
                     messages=messages,
                 ),

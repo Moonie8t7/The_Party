@@ -29,7 +29,7 @@ class OpenAIProvider(BaseProvider):
                 None,
                 lambda: self.client.chat.completions.create(
                     model=character.model_id,
-                    max_tokens=300,
+                    max_tokens=600,
                     messages=full_messages,
                 ),
             )

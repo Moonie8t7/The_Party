@@ -405,6 +405,11 @@ async def route_trigger(trigger: Trigger) -> list[str]:
 
 async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]]:
     """Internal router logic."""
+    # ── Redundancy check ──────────
+    if trigger.type == TriggerType.TIMED and "observe and comment" in trigger.text:
+        log.info("router.ignore_redundant_timed", trigger_id=trigger.trigger_id)
+        return [], "ignored_redundant", set()
+
     if trigger.type == TriggerType.IDLE:
         all_chars = list(CHARACTERS.keys())
         random.shuffle(all_chars)

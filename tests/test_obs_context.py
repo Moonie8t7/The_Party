@@ -5,6 +5,7 @@ from party.context import obs_context
 @pytest.mark.asyncio
 async def test_get_current_scene_success():
     """Verify get_current_scene returns the correct name on success."""
+    obs_context.clear_scene_cache()
     mock_response = MagicMock()
     mock_response.current_program_scene_name = "Gaming"
     
@@ -20,6 +21,7 @@ async def test_get_current_scene_success():
 @pytest.mark.asyncio
 async def test_get_current_scene_failure_returns_unknown():
     """Verify get_current_scene returns 'Unknown' on connection failure."""
+    obs_context.clear_scene_cache()
     with patch("obsws_python.ReqClient", side_effect=Exception("Connection refused")):
         scene = await obs_context.get_current_scene()
         assert scene == "Unknown"
