@@ -22,17 +22,44 @@ class OverlayServer:
         self._lock = asyncio.Lock()
 
     async def start(self):
-        """Start the overlay WebSocket server."""
+        """Start the overlay WebSocket server with HTTP analytics API."""
         self._server = await websockets.serve(
             self._handle_client,
             settings.overlay_host,
             settings.overlay_port,
+            process_request=self._handle_http_request,
         )
         log.info(
             "overlay.server_started",
             host=settings.overlay_host,
             port=settings.overlay_port,
         )
+
+    async def _handle_http_request(self, path, request_headers):
+        """Handle HTTP GET requests for the analytics API."""
+        if path == "/api/stats":
+            from party.persistence.stats import load_transcript, compute_stats
+            import http
+            
+            try:
+                entries = load_transcript()
+                stats = compute_stats(entries)
+                body = json.dumps(stats).encode()
+                
+                return (
+                    http.HTTPStatus.OK,
+                    [
+                        ("Content-Type", "application/json"),
+                        ("Access-Control-Allow-Origin", "*"),
+                        ("Content-Length", str(len(body)))
+                    ],
+                    body
+                )
+            except Exception as e:
+                log.error("overlay.api_stats_failed", reason=str(e))
+                return (http.HTTPStatus.INTERNAL_SERVER_ERROR, [], b"Internal Server Error")
+        
+        return None  # Continue with WebSocket handshake
 
     async def _handle_client(self, websocket):
         """Handle a new overlay client connection."""

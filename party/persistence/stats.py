@@ -1,23 +1,14 @@
-"""
-Minimal analytics server for The Party.
-Run with: python analytics/server.py
-Then open analytics/index.html in a browser.
-"""
-
 import json
-import os
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
+from party.config import settings
 
-TRANSCRIPT_PATH = Path("logs/transcript.jsonl")
-PORT = 8787
-
-
-def load_transcript() -> list[dict]:
-    if not TRANSCRIPT_PATH.exists():
+def load_transcript(path: str = "") -> list[dict]:
+    transcript_path = Path(path or settings.transcript_path)
+    if not transcript_path.exists():
         return []
+    
     entries = []
-    with open(TRANSCRIPT_PATH) as f:
+    with open(transcript_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line:
@@ -26,7 +17,6 @@ def load_transcript() -> list[dict]:
                 except json.JSONDecodeError:
                     pass
     return entries
-
 
 def compute_stats(entries: list[dict]) -> dict:
     if not entries:
@@ -100,32 +90,3 @@ def compute_stats(entries: list[dict]) -> dict:
             for e in recent
         ],
     }
-
-
-class AnalyticsHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass  # Suppress request logs
-
-    def do_GET(self):
-        if self.path == "/api/stats":
-            entries = load_transcript()
-            stats = compute_stats(entries)
-            body = json.dumps(stats).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Content-Length", len(body))
-            self.end_headers()
-            self.wfile.write(body)
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-
-if __name__ == "__main__":
-    server = HTTPServer(("localhost", PORT), AnalyticsHandler)
-    print(f"Analytics server running at http://localhost:{PORT}")
-    print(f"Reading from: {TRANSCRIPT_PATH.absolute()}")
-    print("Open analytics/index.html in your browser.")
-    print("Ctrl+C to stop.")
-    server.serve_forever()

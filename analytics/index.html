@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -210,7 +210,7 @@
   <button id="refresh-btn" onclick="loadStats()">↺ REFRESH</button>
   <span id="last-updated"></span>
 
-  <div id="error-msg">Could not connect to analytics server. Run: python analytics/server.py</div>
+  <div id="error-msg">Could not connect to Orchestrator API. Ensure the main server is running.</div>
 
   <div class="stat-grid" id="stat-grid">
     <!-- populated by JS -->
@@ -250,7 +250,7 @@
     async function loadStats() {
       document.getElementById('error-msg').style.display = 'none';
       try {
-        const res = await fetch('http://localhost:8787/api/stats');
+        const res = await fetch('http://localhost:8766/api/stats');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         renderStats(data);

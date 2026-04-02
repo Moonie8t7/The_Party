@@ -64,9 +64,12 @@ python -m party.main
 
 You should see the system initialize, populate the Twitch context, and start listening on:
 - **ws://localhost:8765**: Orchestrator (Connected to Streamer.bot)
-- **ws://localhost:8766**: Overlay (Connected to OBS Browser Source)
+- **ws://localhost:8766**: Overlay & Analytics API (Integrated)
 
-## 6. Streamer.bot Wiring
+## 6. Analytics Dashboard
+The analytics dashboard is built-in. Simply open `analytics/index.html` in any web browser while the orchestrator is running. It will automatically connect to the API on port `8766`.
+
+## 7. Streamer.bot Wiring
 
 1. Create an Action in Streamer.bot.
 2. Add an **Execute C# Code** sub-action.
