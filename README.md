@@ -4,7 +4,10 @@
 **A Multi-LLM Twitch Overlay System**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-[![OBS Studio](https://img.shields.io/badge/OBS-WebSockets-lightgrey.svg)](https://obsproject.com/)
+[![OBS Studio](https://img.shields.io/badge/OBS-Studio-black.svg?logo=obsstudio)](https://obsproject.com/)
+[![Streamer.bot](https://img.shields.io/badge/Streamer.bot-purple.svg)](https://streamer.bot/)
+[![Twitch](https://img.shields.io/badge/Twitch-API-9146FF.svg?logo=twitch)](https://twitch.tv/)
+[![ElevenLabs](https://img.shields.io/badge/ElevenLabs-TTS-black.svg)](https://elevenlabs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 *Built by Moonie ([WatchMoonie](https://twitch.tv/watchmoonie))*
@@ -30,7 +33,7 @@ Each character is powered by a different Large Language Model, integrating Anthr
 
 ## Architecture
 
-The orchestrator operates purely locally, connecting to **Streamer.bot** via UDP payloads and driving **OBS Studio** via websockets.
+The orchestrator operates purely locally, acting as a server that **Streamer.bot** connects to via WebSockets, whilst simultaneously driving **OBS Studio** via WebSockets.
 
 ```mermaid
 graph TD
