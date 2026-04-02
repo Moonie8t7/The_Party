@@ -9,39 +9,28 @@ log = get_logger(__name__)
 
 
 class SpeechManager:
-    async def play(self, scene: Scene) -> None:
-        trigger_id = scene.trigger.trigger_id
-
-        next_audio_task = None
+    async def play_item(self, response: CharacterResponse) -> None:
+        """
+        Play a single response immediately. 
+        Used for incremental updates to minimize perceived latency.
+        """
+        character = CHARACTERS.get(response.name)
+        vs = character.voice_settings if character else None
         
-        for i, response in enumerate(scene.responses):
-            character = CHARACTERS.get(response.name)
-            vs = character.voice_settings if character else None
-            
-            # 1. Get the current audio
-            if next_audio_task:
-                audio_bytes = await next_audio_task
-            else:
-                audio_bytes = await tts.generate(response.text, response.voice_id, response.name, vs)
-                
-            # 2. Pipeline the next audio generation
-            if i + 1 < len(scene.responses):
-                next_resp = scene.responses[i+1]
-                next_char = CHARACTERS.get(next_resp.name)
-                next_vs = next_char.voice_settings if next_char else None
-                next_audio_task = asyncio.create_task(
-                    tts.generate(next_resp.text, next_resp.voice_id, next_resp.name, next_vs)
-                )
+        audio_bytes = await tts.generate(response.text, response.voice_id, response.name, vs)
+        
+        log.info("speech.start", character=response.name)
+        await obs_notify("speaking_start", response.name, text=response.text, display_name=response.display_name)
+        await tts.play(audio_bytes, response.text, response.name)
+        await obs_notify("speaking_end", response.name)
+        log.info("speech.end", character=response.name)
+        
+        await asyncio.sleep(settings.inter_character_gap_seconds)
 
-            # 3. Perform synchronized playback and notifications
-            log.info("speech.start", trigger_id=trigger_id, character=response.name)
-            await obs_notify("speaking_start", response.name, text=response.text, display_name=response.display_name)
-            await tts.play(audio_bytes, response.text, response.name)
-            await obs_notify("speaking_end", response.name)
-            log.info("speech.end", trigger_id=trigger_id, character=response.name)
-            
-            await asyncio.sleep(settings.inter_character_gap_seconds)
-
+    async def play(self, scene: Scene) -> None:
+        """Sequential playback of a full scene (Legacy/Fallback)."""
+        for response in scene.responses:
+            await self.play_item(response)
         await obs_notify("idle", None)
 
 

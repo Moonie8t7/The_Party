@@ -25,9 +25,15 @@ log = get_logger(__name__)
 
 async def _full_pipeline(trigger):
     """Orchestrate, speak, and persist a single trigger."""
-    scene = await orchestrate(trigger)
-    await speech_manager.play(scene)
-    await write_transcript(scene)
+    from party.models import CharacterResponse, Scene
+    
+    async for item in orchestrate(trigger):
+        if isinstance(item, CharacterResponse):
+            await speech_manager.play_item(item)
+        elif isinstance(item, Scene):
+            await write_transcript(item)
+        elif isinstance(item, dict) and item.get("event") == "orchestration_start":
+            log.debug("pipeline.orchestration_start", trigger_id=trigger.trigger_id, characters=item.get("characters"))
 
 
 async def main():

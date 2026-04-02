@@ -1,8 +1,9 @@
 import re
 import time
 import os
+import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Optional, AsyncGenerator, Any
 from party.models import Trigger, Scene, Character, CharacterResponse, CHARACTERS, TriggerType
 from party.providers.base import ProviderError
 from party.providers.anthropic import AnthropicProvider
@@ -69,8 +70,6 @@ async def _build_context_preamble() -> str:
 
 
 COMPANION_CLOSING = (
-    "You are making a brief unrequested side comment - 1 sentence maximum. "
-    "You were not directly asked. React naturally and instinctively to what "
     "Now add a brief (1 sentence) unrequested comment to the conversation. "
     "Acknowledge what was just said. Use natural social recall for any past events."
 )
@@ -111,15 +110,43 @@ async def run_chain(
     trigger: Trigger,
     character_names: list[str],
     companion_characters: Optional[set[str]] = None,
-) -> list[CharacterResponse]:
+) -> AsyncGenerator[CharacterResponse, None]:
     """
-    Calls each character in order, passing prior responses as context.
-    Returns list of CharacterResponse objects (skips failed providers).
-    companion_characters: names that receive the brief companion instruction.
+    Calls characters. If TriggerType is SYSTEM, calls in parallel.
+    Otherwise, calls sequentially to allow building on context.
+    Yields CharacterResponse objects as they are ready.
     """
-    results = []
     session_snapshot = await _build_context_preamble()
     
+    # Parallel execution for SYSTEM events to minimize actual latency
+    if trigger.type == TriggerType.SYSTEM:
+        log.info("chain.parallel_execution", trigger_id=trigger.trigger_id, count=len(character_names))
+        
+        context_messages = [{"role": "user", "content": f"System event: {trigger.text}"}]
+        tasks = []
+        for name in character_names:
+            tasks.append(call_character(CHARACTERS[name], session_snapshot, context_messages))
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for i, res in enumerate(results):
+            name = character_names[i]
+            if isinstance(res, Exception):
+                log.error("provider.error", trigger_id=trigger.trigger_id, character=name, reason=str(res))
+                continue
+            
+            # Repair and yield
+            repair = repair_response(res.text, trigger_id=trigger.trigger_id, character_name=name)
+            response = res.model_copy(update={
+                "text": repair.text,
+                "repaired": repair.repaired,
+                "length_chars": len(repair.text),
+                "length_sentences": repair.sentence_count,
+            })
+            yield response
+        return
+
+    # Sequential execution for conversation/idle
+    results = []
     if trigger.type == TriggerType.IDLE:
         context_messages = [{"role": "user", "content": "Start an idle conversation based on the current scene and context."}]
     else:
@@ -127,26 +154,13 @@ async def run_chain(
 
     for i, name in enumerate(character_names):
         character = CHARACTERS[name]
-        log.info(
-            "provider.call_start",
-            trigger_id=trigger.trigger_id,
-            character=name,
-            provider=character.provider_type,
-        )
+        log.info("provider.call_start", trigger_id=trigger.trigger_id, character=name, provider=character.provider_type)
 
         try:
             response = await call_character(character, session_snapshot, context_messages)
 
             # Repair output
             repair = repair_response(response.text, trigger_id=trigger.trigger_id, character_name=name)
-            if repair.length_violation:
-                log.warning(
-                    "repair.length_violation",
-                    trigger_id=trigger.trigger_id,
-                    character=name,
-                    sentence_count=repair.sentence_count,
-                    limit=SENTENCE_LIMITS.get(name, 5),
-                )
             response = response.model_copy(
                 update={
                     "text": repair.text,
@@ -163,27 +177,14 @@ async def run_chain(
                 provider=character.provider_type,
                 latency_ms=response.latency_ms,
             )
-            log.debug(
-                "chain.response_text",
-                character=name,
-                text=response.text,
-                length_chars=response.length_chars,
-                length_sentences=response.length_sentences,
-            )
             results.append(response)
+            yield response  # Yield immediately for incremental delivery!
 
         except ProviderError as e:
-            log.error(
-                "provider.error",
-                trigger_id=trigger.trigger_id,
-                character=name,
-                provider=e.provider,
-                reason=e.reason,
-            )
-            log.warning("provider.skip", trigger_id=trigger.trigger_id, character=name)
+            log.error("provider.error", trigger_id=trigger.trigger_id, character=name, provider=e.provider, reason=e.reason)
             continue
 
-        # Build context for next character - check if the *next* character is a companion
+        # Build context for next character
         next_name = character_names[i + 1] if i + 1 < len(character_names) else None
         is_companion = (
             companion_characters is not None
@@ -200,49 +201,50 @@ async def run_chain(
             summary_lines.append("")
 
         if is_companion:
-            primary_display = results[0].display_name if results else "the previous speaker"
-            closing = COMPANION_CLOSING.format(primary=primary_display)
-            log.debug(
-                "chain.companion_closing_applied",
-                companion=next_name,
-                primary=primary_display,
-            )
+            closing = COMPANION_CLOSING
         else:
             closing = NORMAL_CLOSING
 
         summary_lines.append(closing)
         context_messages = [{"role": "user", "content": "\n".join(summary_lines)}]
 
-    return results
 
-
-async def orchestrate(trigger: Trigger) -> Scene:
-    """Full orchestration pipeline: route → chain → return Scene."""
+async def orchestrate(trigger: Trigger) -> AsyncGenerator[Any, None]:
+    """
+    Full orchestration pipeline. Yields:
+    1. (metadata) dict with character_names, router_method
+    2. (results) CharacterResponse objects as they finish
+    3. (final) Scene object (for persistence)
+    """
     start = time.monotonic()
 
     character_names, router_method, companion_set = await _route_with_method(trigger)
-    results = await run_chain(trigger, character_names, companion_characters=companion_set)
+    
+    # Yield initial metadata so overlay/speech can prepare if needed
+    yield {
+        "event": "orchestration_start",
+        "characters": character_names,
+        "method": router_method,
+    }
+
+    final_results = []
+    async for response in run_chain(trigger, character_names, companion_characters=companion_set):
+        final_results.append(response)
+        yield response
 
     total_latency_ms = int((time.monotonic() - start) * 1000)
-
-    error = None
-    if not results:
-        error = "all_providers_failed"
-        log.error("scene.error", trigger_id=trigger.trigger_id, reason=error)
-    else:
-        spoken = [r.name for r in results]
-        log.info(
-            "scene.complete",
-            trigger_id=trigger.trigger_id,
-            characters_spoken=spoken,
-            total_latency_ms=total_latency_ms,
-        )
-
-    return Scene(
+    
+    error = "all_providers_failed" if not final_results else None
+    scene = Scene(
         trigger=trigger,
         characters=character_names,
-        responses=results,
+        responses=final_results,
         router_method=router_method,
         total_latency_ms=total_latency_ms,
         error=error,
     )
+    
+    if not error:
+        log.info("scene.complete", trigger_id=trigger.trigger_id, total_latency_ms=total_latency_ms)
+    
+    yield scene

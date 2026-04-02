@@ -1,17 +1,18 @@
 import pytest
+import asyncio
 from unittest.mock import AsyncMock, patch
-from party.orchestration.chain import run_chain
+from party.orchestration.chain import run_chain, COMPANION_CLOSING, NORMAL_CLOSING
 from party.models import Trigger, TriggerType, TriggerPriority, CharacterResponse
 from party.providers.base import ProviderError
 import uuid
 from datetime import datetime
 
 
-def make_trigger(text: str) -> Trigger:
+def make_trigger(text: str, ttype: TriggerType = TriggerType.HOTKEY) -> Trigger:
     return Trigger(
         trigger_id=str(uuid.uuid4()),
         received_at=datetime.utcnow(),
-        type=TriggerType.HOTKEY,
+        type=ttype,
         text=text,
         priority=TriggerPriority.NORMAL,
         cooldown_key=None,
@@ -40,7 +41,7 @@ async def test_chain_returns_responses_for_all_characters():
             mock_response("grokthar", "Grokthar", "Told you so."),
             mock_response("geptima", "Geptima", "Right, so accidents happen."),
         ]
-        responses = await run_chain(trigger, characters)
+        responses = [r async for r in run_chain(trigger, characters)]
 
     assert len(responses) == 2
     assert responses[0].name == "grokthar"
@@ -59,7 +60,7 @@ async def test_chain_skips_failed_provider():
             ProviderError("openai", "geptima", "timeout"),
             mock_response("deepwilla", "Deepwilla", "Fascinating failure mode."),
         ]
-        responses = await run_chain(trigger, characters)
+        responses = [r async for r in run_chain(trigger, characters)]
 
     assert len(responses) == 2
     names = [r.name for r in responses]
@@ -69,19 +70,29 @@ async def test_chain_skips_failed_provider():
 
 
 @pytest.mark.asyncio
-async def test_chain_returns_empty_if_all_providers_fail():
-    """If every provider fails, return empty list with no crash."""
-    trigger = make_trigger("DM Moonie died.")
+async def test_chain_parallel_execution_for_system_trigger():
+    """SYSTEM triggers should run in parallel via asyncio.gather."""
+    trigger = make_trigger("Death", ttype=TriggerType.SYSTEM)
     characters = ["grokthar", "geptima"]
 
     with patch("party.orchestration.chain.call_character") as mock_call:
-        mock_call.side_effect = [
-            ProviderError("grok", "grokthar", "timeout"),
-            ProviderError("openai", "geptima", "timeout"),
-        ]
-        responses = await run_chain(trigger, characters)
+        # Map character name to response, with geptima being slow
+        async def side_effect_fn(character, snapshot, messages):
+            if character.name == "geptima":
+                await asyncio.sleep(0.2)
+                return mock_response("geptima", "Geptima", "Oh no.")
+            return mock_response("grokthar", "Grokthar", "DEAD.")
 
-    assert responses == []
+        mock_call.side_effect = side_effect_fn
+        
+        import time as _time
+        start = _time.monotonic()
+        responses = [r async for r in run_chain(trigger, characters)]
+        elapsed = _time.monotonic() - start
+        
+        # Parallel execution: should be ~0.2s, not 0.4s
+        assert elapsed < 0.5
+        assert len(responses) == 2
 
 
 @pytest.mark.asyncio
@@ -98,7 +109,7 @@ async def test_chain_passes_context_to_subsequent_characters():
         return mock_response("geptima", "Geptima", "Right, accidents happen.")
 
     with patch("party.orchestration.chain.call_character", side_effect=capture_call):
-        await run_chain(trigger, characters)
+        responses = [r async for r in run_chain(trigger, characters)]
 
     second_call_messages = calls[1][1]
     assert any("Grokthar" in str(m) for m in second_call_messages)
@@ -107,8 +118,6 @@ async def test_chain_passes_context_to_subsequent_characters():
 @pytest.mark.asyncio
 async def test_chain_applies_companion_closing_to_companion_character():
     """Companion character should receive COMPANION_CLOSING, not NORMAL_CLOSING."""
-    from party.orchestration.chain import COMPANION_CLOSING, NORMAL_CLOSING
-
     trigger = make_trigger("Grokthar: how many times has Moonie died now?")
     characters = ["grokthar", "geptima"]
     calls = []
@@ -120,16 +129,32 @@ async def test_chain_applies_companion_closing_to_companion_character():
         return mock_response("geptima", "Geptima", "Statistically speaking...")
 
     with patch("party.orchestration.chain.call_character", side_effect=capture_call):
-        await run_chain(trigger, characters, companion_characters={"geptima"})
+        responses = [r async for r in run_chain(trigger, characters, companion_characters={"geptima"})]
 
     # Grokthar's call uses the initial context (no closing instruction)
     grokthar_content = calls[0][1][0]["content"]
-    assert "brief unrequested side comment" not in grokthar_content
+    assert "Now add a brief" not in grokthar_content
 
     # Geptima's call should use COMPANION_CLOSING
     geptima_content = calls[1][1][0]["content"]
-    assert "brief unrequested side comment" in geptima_content
-    assert "Now respond as your character" not in geptima_content
+    assert "Now add a brief" in geptima_content
+    assert "Now respond as your character, aware" not in geptima_content
+
+
+@pytest.mark.asyncio
+async def test_chain_returns_empty_if_all_providers_fail():
+    """If every provider fails, the generator yields nothing."""
+    trigger = make_trigger("DM Moonie died.")
+    characters = ["grokthar", "geptima"]
+
+    with patch("party.orchestration.chain.call_character") as mock_call:
+        mock_call.side_effect = [
+            ProviderError("grok", "grokthar", "timeout"),
+            ProviderError("openai", "geptima", "timeout"),
+        ]
+        responses = [r async for r in run_chain(trigger, characters)]
+
+    assert responses == []
 
 
 @pytest.mark.asyncio
@@ -146,8 +171,8 @@ async def test_chain_applies_normal_closing_when_no_companion_set():
         return mock_response("geptima", "Geptima", "Right, accidents happen.")
 
     with patch("party.orchestration.chain.call_character", side_effect=capture_call):
-        await run_chain(trigger, characters, companion_characters=None)
+        responses = [r async for r in run_chain(trigger, characters, companion_characters=None)]
 
     geptima_content = calls[1][1][0]["content"]
     assert "Now respond as your character" in geptima_content
-    assert "brief unrequested side comment" not in geptima_content
+    assert "Now add a brief" not in geptima_content
