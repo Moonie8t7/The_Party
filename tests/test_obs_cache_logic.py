@@ -1,9 +1,11 @@
 import asyncio
 import time
 from unittest.mock import patch, MagicMock
-from party.context.obs_context import get_current_scene
+from party.context.obs_context import get_current_scene, clear_scene_cache
 
 async def test_obs_cache():
+    # Clear any existing cache from previous test runs
+    clear_scene_cache()
     # Mock the internal sync call
     mock_sync = MagicMock()
     mock_sync.return_value = "TestScene"
