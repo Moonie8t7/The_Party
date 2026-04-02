@@ -52,6 +52,18 @@ async def _build_context_preamble() -> str:
     scene = await get_current_scene()
     parts.append(f"Current OBS Scene: {scene}")
 
+    # Stream Feats (Manual log)
+    feats_path = os.path.join("session", "stream_feats.txt")
+    if os.path.exists(feats_path):
+        try:
+            with open(feats_path, "r", encoding="utf-8") as f:
+                feats = f.read().strip()
+                if feats:
+                    parts.append("\nStream Feats and Milestones (Historical context):")
+                    parts.append(feats)
+        except Exception:
+            pass
+
     return "\n".join(parts)
 
 

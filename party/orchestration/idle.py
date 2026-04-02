@@ -54,7 +54,7 @@ class IdleCoordinator:
                 log.info("idle.triggering_chatter", scene=scene, elapsed_seconds=int(elapsed))
                 trigger = Trigger(
                     type=TriggerType.IDLE,
-                    text=f"[System: The party is idling on the '{scene}' scene. Start a natural, unprompted conversation among yourselves based on the current context and your personalities. Direct your remarks to each other and Moonie.]",
+                    text=f"[System: The party is idling on the '{scene}' scene. Start a natural, deeply in-character conversation. Ask each other personal questions about your classes, backgrounds, or motivations. Show real emotion and personality. Acknowledge Moonie's feelings if relevant based on the Session Context or Stream Feats.]",
                     priority=TriggerPriority.NORMAL,
                     cooldown_key="idle_chatter",
                     game=None

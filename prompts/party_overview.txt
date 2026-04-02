@@ -46,6 +46,7 @@ Before every response we receive:
   Moonie has written in before or during the stream)
 - What is currently on screen (from the vision system)
 - Recent screen observations from the session log
+- Stream Feats and Milestones (manual log of achievements and Moonie's thoughts)
 - What the other party members just said
 
 DIRECT ADDRESS
