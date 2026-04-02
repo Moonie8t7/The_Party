@@ -1,4 +1,4 @@
-"""
+﻿"""
 Entry point for The Party orchestrator.
 Run with: python -m party.main
 """
@@ -35,7 +35,7 @@ async def main():
     configure_logging()
     log.info("startup.begin")
 
-    # 2. Validate config — log non-secret values
+    # 2. Validate config - log non-secret values
     log.info(
         "startup.config",
         ws_host=settings.ws_host,
@@ -55,7 +55,7 @@ async def main():
     # 3. Validate all five prompt files loaded
     for name, char in CHARACTERS.items():
         if not char.prompt:
-            raise RuntimeError(f"Prompt for '{name}' is empty — check prompts/{name}.txt")
+            raise RuntimeError(f"Prompt for '{name}' is empty - check prompts/{name}.txt")
     log.info("startup.prompts_ok", count=len(CHARACTERS))
 
     # 3b. Populate session context
@@ -94,7 +94,7 @@ async def main():
             use_speaker_boost=vs.use_speaker_boost,
         )
 
-    # 4. Wire up the scheduler (no auto-start — we start manually below)
+    # 4. Wire up the scheduler (no auto-start - we start manually below)
     scheduler = Scheduler()
     scheduler.set_handler(_full_pipeline)
 

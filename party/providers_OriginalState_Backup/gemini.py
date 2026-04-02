@@ -8,10 +8,6 @@ from party.providers.costs import estimate_cost
 
 
 class GeminiProvider(BaseProvider):
-    def __init__(self):
-        super().__init__()
-        self.client = genai.Client(api_key=settings.gemini_api_key)
-
     async def call(
         self,
         character: Character,
@@ -25,6 +21,7 @@ class GeminiProvider(BaseProvider):
         async def _call():
             import asyncio
             loop = asyncio.get_event_loop()
+            client = genai.Client(api_key=settings.gemini_api_key)
 
             contents = []
             for msg in messages:
@@ -33,12 +30,12 @@ class GeminiProvider(BaseProvider):
 
             response = await loop.run_in_executor(
                 None,
-                lambda: self.client.models.generate_content(
+                lambda: client.models.generate_content(
                     model=character.model_id,
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=full_prompt,
-                        max_output_tokens=400,
+                        max_output_tokens=800,
                     ),
                 ),
             )

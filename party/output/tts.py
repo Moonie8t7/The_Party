@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import io
 import time
 from party.config import settings
@@ -10,70 +10,57 @@ log = get_logger(__name__)
 _DEFAULT_VOICE_SETTINGS = CharacterVoiceSettings()
 
 
-async def speak(
+async def generate(
     text: str,
     voice_id: str,
     character_name: str,
     voice_settings: CharacterVoiceSettings | None = None,
-) -> None:
-    """
-    Speaks text using ElevenLabs if API key is set, otherwise uses placeholder.
-    Always awaitable. Never raises — logs errors and falls back silently.
-    """
+) -> bytes | None:
+    """Generates audio bytes via ElevenLabs. Returns None if disabled or failed."""
     vs = voice_settings if voice_settings is not None else _DEFAULT_VOICE_SETTINGS
 
     if not settings.elevenlabs_api_key:
-        await _placeholder_speak(text, character_name)
-        return
+        return None  # Placeholder logic handles simulation during play()
 
     try:
-        await _elevenlabs_speak(text, voice_id, character_name, vs)
+        from elevenlabs.client import ElevenLabs 
+        t_start = time.monotonic()
+        log.info("tts.elevenlabs_start", character=character_name, chars=len(text))
+
+        loop = asyncio.get_event_loop()
+        audio_bytes = await loop.run_in_executor(
+            None,
+            _generate_audio,
+            text,
+            voice_id,
+            vs,
+        )
+        
+        t_generated = time.monotonic()
+        log.info("tts.generation_complete", character=character_name, generation_ms=int((t_generated - t_start) * 1000))
+        return audio_bytes
+        
     except Exception as e:
         log.warning(
             "tts.elevenlabs_failed",
             character=character_name,
             reason=str(e),
         )
+        return None
+
+async def play(audio_bytes: bytes | None, text: str, character_name: str) -> None:
+    """Plays audio bytes or simulates fallback wait if bytes are None."""
+    if audio_bytes is None:
         await _placeholder_speak(text, character_name)
-
-
-async def _elevenlabs_speak(
-    text: str, voice_id: str, character_name: str, vs: CharacterVoiceSettings
-) -> None:
-    """Real ElevenLabs TTS call + audio playback."""
-    from elevenlabs.client import ElevenLabs  # noqa: import inside to keep module loadable without key
-
+        return
+        
     t_start = time.monotonic()
-    log.info("tts.elevenlabs_start", character=character_name, chars=len(text))
-
     loop = asyncio.get_event_loop()
-
-    # Synchronous API call runs in thread pool — never blocks asyncio
-    audio_bytes = await loop.run_in_executor(
-        None,
-        _generate_audio,
-        text,
-        voice_id,
-        vs,
-    )
-
-    t_generated = time.monotonic()
-
-    # Playback also blocks — run in thread pool so asyncio stays free
     await loop.run_in_executor(None, _play_audio_bytes, audio_bytes)
-
     t_complete = time.monotonic()
-
-    log.info(
-        "tts.timing",
-        character=character_name,
-        generation_ms=int((t_generated - t_start) * 1000),
-        playback_ms=int((t_complete - t_generated) * 1000),
-        total_ms=int((t_complete - t_start) * 1000),
-    )
+    
+    log.info("tts.timing", character=character_name, playback_ms=int((t_complete - t_start) * 1000))
     log.info("tts.elevenlabs_complete", character=character_name)
-
-
 def _generate_audio(text: str, voice_id: str, vs: CharacterVoiceSettings) -> bytes:
     """Synchronous ElevenLabs audio generation. Run in thread pool."""
     from elevenlabs.client import ElevenLabs
@@ -110,7 +97,7 @@ def _play_audio_bytes(audio_bytes: bytes) -> None:
 
 
 async def _placeholder_speak(text: str, character_name: str) -> None:
-    """Simulated TTS — sleeps to simulate speaking duration at 0.4s/word."""
+    """Simulated TTS - sleeps to simulate speaking duration at 0.4s/word."""
     word_count = len(text.split())
     duration = word_count * 0.4
     log.debug(

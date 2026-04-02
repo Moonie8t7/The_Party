@@ -7,6 +7,13 @@ from party.providers.costs import estimate_cost
 
 
 class DeepSeekProvider(BaseProvider):
+    def __init__(self):
+        super().__init__()
+        self.client = OpenAI(
+            api_key=settings.deepseek_api_key,
+            base_url="https://api.deepseek.com",
+        )
+
     async def call(
         self,
         character: Character,
@@ -20,14 +27,10 @@ class DeepSeekProvider(BaseProvider):
         async def _call():
             import asyncio
             loop = asyncio.get_event_loop()
-            client = OpenAI(
-                api_key=settings.deepseek_api_key,
-                base_url="https://api.deepseek.com",
-            )
             full_messages = [{"role": "system", "content": full_prompt}] + messages
             response = await loop.run_in_executor(
                 None,
-                lambda: client.chat.completions.create(
+                lambda: self.client.chat.completions.create(
                     model=character.model_id,
                     max_tokens=300,
                     messages=full_messages,

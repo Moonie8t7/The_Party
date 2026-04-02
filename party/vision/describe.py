@@ -1,6 +1,6 @@
-"""
+﻿"""
 GPT-4o Vision description of a burst of screenshots.
-Accepts 1–N base64-encoded frames and returns a concise description.
+Accepts 1-N base64-encoded frames and returns a concise description.
 """
 
 import asyncio
@@ -17,7 +17,8 @@ SEQUENCE_PROMPT = (
     "Describe what is happening on screen as a brief narrative (2-3 sentences). "
     "Mention the game state, what the player is doing, any notable changes between frames, "
     "and any relevant UI elements (health, ammo, objectives). "
-    "Write in present tense. Be concise and specific."
+    "Write in present tense. Be concise and specific. "
+    "CRITICAL: Ignore the character portraits and any speech panels at the very bottom of the screen. These are stream overlays, NOT the game itself. Focus ONLY on the actual gameplay footage behind them."
 )
 
 SINGLE_PROMPT = (
@@ -26,7 +27,8 @@ SINGLE_PROMPT = (
     "Be specific: mention the game state, what the player is doing, "
     "any notable UI elements (health, ammo, objectives), and the general "
     "situation. Do not speculate about what might happen next. "
-    "Write in present tense. Be concise."
+    "Write in present tense. Be concise. "
+    "CRITICAL: Ignore the character portraits and any speech panels at the very bottom of the screen. These are stream overlays, NOT the game itself. Focus ONLY on the actual gameplay footage behind them."
 )
 
 

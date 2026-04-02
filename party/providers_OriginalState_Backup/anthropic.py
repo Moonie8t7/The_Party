@@ -1,16 +1,12 @@
 import time
-from openai import OpenAI
+from anthropic import Anthropic
 from party.models import Character, CharacterResponse
 from party.config import settings
 from party.providers.base import BaseProvider, ProviderError
 from party.providers.costs import estimate_cost
 
 
-class OpenAIProvider(BaseProvider):
-    def __init__(self):
-        super().__init__()
-        self.client = OpenAI(api_key=settings.openai_api_key)
-
+class AnthropicProvider(BaseProvider):
     async def call(
         self,
         character: Character,
@@ -24,18 +20,19 @@ class OpenAIProvider(BaseProvider):
         async def _call():
             import asyncio
             loop = asyncio.get_event_loop()
-            full_messages = [{"role": "system", "content": full_prompt}] + messages
+            client = Anthropic(api_key=settings.anthropic_api_key)
             response = await loop.run_in_executor(
                 None,
-                lambda: self.client.chat.completions.create(
+                lambda: client.messages.create(
                     model=character.model_id,
                     max_tokens=300,
-                    messages=full_messages,
+                    system=full_prompt,
+                    messages=messages,
                 ),
             )
-            text = response.choices[0].message.content.strip()
-            input_tokens = response.usage.prompt_tokens if response.usage else 0
-            output_tokens = response.usage.completion_tokens if response.usage else 0
+            text = response.content[0].text.strip()
+            input_tokens = response.usage.input_tokens if response.usage else 0
+            output_tokens = response.usage.output_tokens if response.usage else 0
             return text, input_tokens, output_tokens
 
         try:
@@ -43,7 +40,7 @@ class OpenAIProvider(BaseProvider):
         except ProviderError:
             raise
         except Exception as e:
-            raise ProviderError("openai", character.name, str(e))
+            raise ProviderError("anthropic", character.name, str(e))
 
         latency_ms = int((time.monotonic() - start) * 1000)
         return CharacterResponse(
@@ -51,9 +48,9 @@ class OpenAIProvider(BaseProvider):
             display_name=character.display_name,
             text=text,
             voice_id=character.voice_id,
-            provider="openai",
+            provider="anthropic",
             latency_ms=latency_ms,
             tokens_input=input_tokens,
             tokens_output=output_tokens,
-            estimated_cost_usd=estimate_cost("openai", input_tokens, output_tokens),
+            estimated_cost_usd=estimate_cost("anthropic", input_tokens, output_tokens),
         )

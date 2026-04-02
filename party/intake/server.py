@@ -1,4 +1,4 @@
-import json
+﻿import json
 import websockets
 from typing import Callable, Awaitable
 from pydantic import ValidationError
@@ -15,7 +15,7 @@ async def handle_message(
 ) -> None:
     """
     Parse, validate, and enqueue a single raw WebSocket message.
-    Extracted for testability — no WebSocket dependency.
+    Extracted for testability - no WebSocket dependency.
     """
     # Parse JSON
     try:

@@ -74,6 +74,19 @@ def repair_response(
     limit = SENTENCE_LIMITS.get(character_name, 5)
     length_violation = sentence_count > limit
 
+    if length_violation:
+        # forcefully slice the sentences!
+        sentences = re.split(r'([.!?]+(?:\s|$))', text.strip())
+        # Re.split with capture group keeps the delimiters: [sentence1, delim1, sentence2, delim2...]
+        sliced_parts = sentences[:limit * 2]
+        trimmed_text = "".join(sliced_parts).strip()
+        
+        if trimmed_text != text:
+             changes.append("hard_trimmed_length")
+             text = trimmed_text
+             sentence_count = limit
+             was_repaired = True
+
     return RepairResult(
         text=text,
         repaired=was_repaired,

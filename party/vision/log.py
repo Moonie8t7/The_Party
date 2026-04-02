@@ -1,6 +1,6 @@
-"""
-Vision log — append-only dated file of vision descriptions.
-One entry per line: "HH:MM:SS — {description}"
+﻿"""
+Vision log - append-only dated file of vision descriptions.
+One entry per line: "HH:MM:SS - {description}"
 Capped at vision_log_max_file_entries lines.
 """
 
@@ -26,7 +26,7 @@ def append_entry(description: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     timestamp = datetime.now().strftime("%H:%M:%S")
-    entry = f"{timestamp} — {description}\n"
+    entry = f"{timestamp} - {description}\n"
 
     # Read existing lines
     if os.path.exists(path):

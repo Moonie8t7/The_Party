@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+﻿from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 import os
 
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # API Keys — required
+    # API Keys - required
     anthropic_api_key: str
     openai_api_key: str
     gemini_api_key: str
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     elevenlabs_stability: float = 0.5
     elevenlabs_similarity_boost: float = 0.75
 
-    # Voice IDs — set in .env after selecting from ElevenLabs voice library
+    # Voice IDs - set in .env after selecting from ElevenLabs voice library
     voice_clauven: str = "PLACEHOLDER_CLAUVEN"
     voice_geptima: str = "PLACEHOLDER_GEPTIMA"
     voice_gemaux: str = "PLACEHOLDER_GEMAUX"

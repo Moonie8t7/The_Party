@@ -1,4 +1,4 @@
-# The Dungeon Arcade — Party Orchestrator Setup
+﻿# The Dungeon Arcade - Party Orchestrator Setup
 
 ## Folder Structure
 
@@ -15,18 +15,18 @@ dungeon_arcade/
 │   └── deepwilla.txt
 ```
 
-## Step 1 — Create the prompts folder
+## Step 1 - Create the prompts folder
 
 Create a `prompts/` folder next to `orchestrator.py`.
 Save each character's system prompt as a `.txt` file with the filename matching the character name exactly.
 
-## Step 2 — Install dependencies
+## Step 2 - Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Step 3 — Add your API keys
+## Step 3 - Add your API keys
 
 Open `orchestrator.py` and fill in the `CONFIG` block at the top:
 
@@ -41,7 +41,7 @@ CONFIG = {
 }
 ```
 
-## Step 4 — Run the orchestrator
+## Step 4 - Run the orchestrator
 
 ```bash
 python orchestrator.py
@@ -55,7 +55,7 @@ You should see:
 
 Keep this running in the background while streaming.
 
-## Step 5 — Set up Streamer.bot
+## Step 5 - Set up Streamer.bot
 
 1. In Streamer.bot, create a new Action
 2. Add an "Execute C# Code" sub-action
@@ -82,7 +82,7 @@ For chat-based triggers, `rawInput` will automatically capture the message:
 string triggerText = args["rawInput"].ToString();
 ```
 
-## Step 6 — Test without Streamer.bot
+## Step 6 - Test without Streamer.bot
 
 You can test the orchestrator directly by sending a WebSocket message.
 Use a tool like `wscat`:
@@ -127,7 +127,7 @@ async def speak(display_name: str, text: str, voice_id: str):
         text=text,
         model_id="eleven_turbo_v2",
     )
-    # Play audio — use pygame or sounddevice
+    # Play audio - use pygame or sounddevice
     play(audio)
 ```
 

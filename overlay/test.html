@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-  <h3>The Party — Overlay Test Harness</h3>
+  <h3>The Party - Overlay Test Harness</h3>
   <p style="font-size:12px; color:#666; margin-bottom:16px;">
     Open overlay.html in OBS browser source, then use these buttons to test events.
     Requires orchestrator running (python -m party.main).
@@ -45,7 +45,7 @@
 
     function log(msg) {
       document.getElementById('log').innerHTML =
-        `<div>${new Date().toLocaleTimeString()} — ${msg}</div>` +
+        `<div>${new Date().toLocaleTimeString()} - ${msg}</div>` +
         document.getElementById('log').innerHTML;
     }
 
@@ -53,7 +53,7 @@
       ws = new WebSocket(WS_URL);
       ws.onopen = () => log('Connected to orchestrator overlay server');
       ws.onclose = () => {
-        log('Disconnected — retrying in 2s');
+        log('Disconnected - retrying in 2s');
         setTimeout(connect, 2000);
       };
     }

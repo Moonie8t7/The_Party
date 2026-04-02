@@ -1,4 +1,4 @@
-"""
+﻿"""
 Whisper STT microphone listener.
 
 Continuously transcribes microphone input using local Whisper model.
@@ -23,7 +23,7 @@ CHANNELS = 1
 CHUNK_DURATION = 0.5        # seconds per audio chunk
 SILENCE_THRESHOLD = 0.01    # RMS below this = silence
 SILENCE_DURATION = 1.2      # seconds of silence to end an utterance
-MAX_UTTERANCE = 30.0        # seconds — maximum utterance length
+MAX_UTTERANCE = 30.0        # seconds - maximum utterance length
 
 
 class STTListener:

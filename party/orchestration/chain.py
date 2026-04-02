@@ -1,4 +1,4 @@
-import re
+﻿import re
 import time
 from datetime import datetime
 from typing import Optional
@@ -50,7 +50,7 @@ def _build_context_preamble() -> str:
 
 
 COMPANION_CLOSING = (
-    "You are making a brief unrequested side comment — 1 sentence maximum. "
+    "You are making a brief unrequested side comment - 1 sentence maximum. "
     "You were not directly asked. React naturally and instinctively to what "
     "{primary} just said. Do not repeat, summarise, or agree with them. "
     "Just your honest gut reaction. One sentence. Then stop."
@@ -63,7 +63,7 @@ NORMAL_CLOSING = (
 
 
 def _count_sentences(text: str) -> int:
-    """Rough sentence count — splits on . ! ? followed by space or end."""
+    """Rough sentence count - splits on . ! ? followed by space or end."""
     sentences = re.split(r'[.!?]+(?:\s|$)', text.strip())
     return len([s for s in sentences if s.strip()])
 
@@ -77,11 +77,12 @@ PROVIDERS = {
 }
 
 
-async def call_character(character: Character, messages: list[dict]) -> CharacterResponse:
+async def call_character(character: Character, session_snapshot: str, messages: list[dict]) -> CharacterResponse:
     """Call a single character's provider. Exposed for testing/mocking."""
+    full_system_prompt = f"{character.prompt}\n\n[SESSION SNAPSHOT]\n{session_snapshot}"
     return await PROVIDERS[character.provider_type].call(
         character,
-        character.prompt,
+        full_system_prompt,
         messages,
     )
 
@@ -97,8 +98,8 @@ async def run_chain(
     companion_characters: names that receive the brief companion instruction.
     """
     results = []
-    preamble = _build_context_preamble()
-    context_messages = [{"role": "user", "content": f"{preamble}\n\nThe situation: {trigger.text}"}]
+    session_snapshot = _build_context_preamble()
+    context_messages = [{"role": "user", "content": f"The situation: {trigger.text}"}]
 
     for i, name in enumerate(character_names):
         character = CHARACTERS[name]
@@ -110,7 +111,7 @@ async def run_chain(
         )
 
         try:
-            response = await call_character(character, context_messages)
+            response = await call_character(character, session_snapshot, context_messages)
 
             # Repair output
             repair = repair_response(response.text, trigger_id=trigger.trigger_id, character_name=name)
@@ -158,7 +159,7 @@ async def run_chain(
             log.warning("provider.skip", trigger_id=trigger.trigger_id, character=name)
             continue
 
-        # Build context for next character — check if the *next* character is a companion
+        # Build context for next character - check if the *next* character is a companion
         next_name = character_names[i + 1] if i + 1 < len(character_names) else None
         is_companion = (
             companion_characters is not None
@@ -166,8 +167,6 @@ async def run_chain(
             and next_name in companion_characters
         )
         summary_lines = [
-            preamble,
-            "",
             f"The situation: {trigger.text}",
             "",
         ]

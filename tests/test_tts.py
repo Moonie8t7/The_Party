@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 import asyncio
 from unittest.mock import patch, AsyncMock, MagicMock
 from party.output import tts
@@ -76,7 +76,7 @@ async def test_speak_never_raises():
 
 
 # ============================================================
-# Sprint 3b — Voice settings tests
+# Sprint 3b - Voice settings tests
 # ============================================================
 
 def test_voice_settings_defaults():

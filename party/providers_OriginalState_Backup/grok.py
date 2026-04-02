@@ -6,11 +6,7 @@ from party.providers.base import BaseProvider, ProviderError
 from party.providers.costs import estimate_cost
 
 
-class OpenAIProvider(BaseProvider):
-    def __init__(self):
-        super().__init__()
-        self.client = OpenAI(api_key=settings.openai_api_key)
-
+class GrokProvider(BaseProvider):
     async def call(
         self,
         character: Character,
@@ -24,10 +20,14 @@ class OpenAIProvider(BaseProvider):
         async def _call():
             import asyncio
             loop = asyncio.get_event_loop()
+            client = OpenAI(
+                api_key=settings.grok_api_key,
+                base_url="https://api.x.ai/v1",
+            )
             full_messages = [{"role": "system", "content": full_prompt}] + messages
             response = await loop.run_in_executor(
                 None,
-                lambda: self.client.chat.completions.create(
+                lambda: client.chat.completions.create(
                     model=character.model_id,
                     max_tokens=300,
                     messages=full_messages,
@@ -43,7 +43,7 @@ class OpenAIProvider(BaseProvider):
         except ProviderError:
             raise
         except Exception as e:
-            raise ProviderError("openai", character.name, str(e))
+            raise ProviderError("grok", character.name, str(e))
 
         latency_ms = int((time.monotonic() - start) * 1000)
         return CharacterResponse(
@@ -51,9 +51,9 @@ class OpenAIProvider(BaseProvider):
             display_name=character.display_name,
             text=text,
             voice_id=character.voice_id,
-            provider="openai",
+            provider="grok",
             latency_ms=latency_ms,
             tokens_input=input_tokens,
             tokens_output=output_tokens,
-            estimated_cost_usd=estimate_cost("openai", input_tokens, output_tokens),
+            estimated_cost_usd=estimate_cost("grok", input_tokens, output_tokens),
         )

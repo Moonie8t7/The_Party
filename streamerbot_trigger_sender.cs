@@ -1,4 +1,4 @@
-// Streamer.bot C# Action — Dungeon Arcade Trigger Sender
+﻿// Streamer.bot C# Action - Dungeon Arcade Trigger Sender
 // Add this as an Execute C# Code action in Streamer.bot
 // Attach to: chat commands, hotkeys, timers, or channel point redemptions
 
@@ -20,7 +20,7 @@ public class CPHInline
         // Type options: "chat_trigger" | "hotkey" | "timed" | "stt"
         string triggerType = "chat_trigger";
 
-        // The text content — for chat triggers use the message,
+        // The text content - for chat triggers use the message,
         // for hotkeys describe what just happened in the game
         string triggerText = args.ContainsKey("rawInput")
             ? args["rawInput"].ToString()

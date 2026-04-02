@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 import asyncio
 from unittest.mock import AsyncMock
 from party.queue.scheduler import Scheduler
@@ -119,7 +119,7 @@ async def test_scheduler_drops_when_full():
 
 @pytest.mark.asyncio
 async def test_scheduler_processes_sequentially():
-    """Consumer should process one trigger at a time — no parallel execution."""
+    """Consumer should process one trigger at a time - no parallel execution."""
     concurrent_count = []
     current = [0]
 

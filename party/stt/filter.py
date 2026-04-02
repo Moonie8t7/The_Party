@@ -1,4 +1,4 @@
-"""
+﻿"""
 STT reaction filter.
 
 A single fast LLM call that decides whether a transcribed utterance
@@ -36,7 +36,7 @@ Respond with ONLY the word YES or NO. Nothing else."""
 async def should_react(utterance: str) -> bool:
     """
     Returns True if the utterance warrants a party reaction.
-    Fast Haiku call — should complete in under 1 second.
+    Fast Haiku call - should complete in under 1 second.
     """
     try:
         client = Anthropic(api_key=settings.anthropic_api_key)

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Session context manager.
 
 Handles:
@@ -23,7 +23,7 @@ def ensure_session_file():
     _SESSION_PATH.parent.mkdir(parents=True, exist_ok=True)
     if not _SESSION_PATH.exists():
         _SESSION_PATH.write_text(
-            "# Session Context — The Party\n"
+            "# Session Context - The Party\n"
             "# Edit anytime mid-stream. Changes take effect on the next trigger.\n\n"
             "DATE: [auto]\n"
             "TIME: [auto]\n"
@@ -85,7 +85,7 @@ def update_auto_fields(
 def read_session_context() -> str:
     """
     Read and return the current session context as a formatted string.
-    Called on every trigger — always fresh.
+    Called on every trigger - always fresh.
     Strips comment lines.
     """
     ensure_session_file()

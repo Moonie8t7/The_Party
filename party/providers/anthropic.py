@@ -7,6 +7,10 @@ from party.providers.costs import estimate_cost
 
 
 class AnthropicProvider(BaseProvider):
+    def __init__(self):
+        super().__init__()
+        self.client = Anthropic(api_key=settings.anthropic_api_key)
+
     async def call(
         self,
         character: Character,
@@ -20,10 +24,9 @@ class AnthropicProvider(BaseProvider):
         async def _call():
             import asyncio
             loop = asyncio.get_event_loop()
-            client = Anthropic(api_key=settings.anthropic_api_key)
             response = await loop.run_in_executor(
                 None,
-                lambda: client.messages.create(
+                lambda: self.client.messages.create(
                     model=character.model_id,
                     max_tokens=300,
                     system=full_prompt,

@@ -1,4 +1,4 @@
-import json
+﻿import json
 import random
 import re
 from anthropic import Anthropic
@@ -243,7 +243,7 @@ ROUTING_RULES = [
         "characters": ["gemaux", "clauven", "deepwilla"],
     },
 
-    # ── STT — Moonie thinking out loud ────────────────────────────
+    # ── STT - Moonie thinking out loud ────────────────────────────
     # Catches uncertainty and self-directed questions
     {
         "keywords": ["i think", "maybe i should", "not sure", "i wonder", "what if i"],
@@ -265,7 +265,7 @@ _DIRECT_ADDRESS_PATTERNS = [
 _CHARACTER_NAMES = ["clauven", "geptima", "gemaux", "grokthar", "deepwilla"]
 
 # COMPANION_PROBABILITIES[primary] = [(companion, probability), ...]
-# Listed in priority order — first to pass speaks
+# Listed in priority order - first to pass speaks
 COMPANION_PROBABILITIES: dict[str, list[tuple[str, float]]] = {
     "clauven": [
         ("grokthar",  0.45),
@@ -332,8 +332,8 @@ def resolve_companion(result: DirectAddressResult) -> Optional[str]:
     Returns the companion's name, or None if no companion speaks.
 
     Two-stage:
-    1. Global gate (50%) — if fails, nobody comments
-    2. Per-character probability — first candidate to pass their roll speaks
+    1. Global gate (50%) - if fails, nobody comments
+    2. Per-character probability - first candidate to pass their roll speaks
     """
     if not result.detected:
         return None
@@ -407,7 +407,7 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
     Internal router. Returns (characters, method, companion_set) where method is
     "rule" | "llm" | "default" | "direct_address". Used by chain.py.
     """
-    # ── Direct address check — runs before all other routing ──────────
+    # ── Direct address check - runs before all other routing ──────────
     direct = detect_direct_address(trigger.text)
     if direct.detected:
         companion = resolve_companion(direct)
@@ -424,7 +424,7 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
         )
         return characters, "direct_address", companion_set
 
-    # ── Existing routing logic below — unchanged ───────────────────────
+    # ── Existing routing logic below - unchanged ───────────────────────
     text_lower = trigger.text.lower()
 
     for idx, rule in enumerate(ROUTING_RULES):

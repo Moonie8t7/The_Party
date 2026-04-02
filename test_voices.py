@@ -1,5 +1,5 @@
-"""
-Voice preview test — run this manually to verify each character's voice.
+﻿"""
+Voice preview test - run this manually to verify each character's voice.
 Usage: python test_voices.py
 Requires ELEVENLABS_API_KEY and VOICE_* vars set in .env
 """

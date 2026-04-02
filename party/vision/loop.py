@@ -1,4 +1,4 @@
-"""
+﻿"""
 Vision background loop.
 
 Runs on a configurable timer. Captures a burst of OBS screenshots,
@@ -71,7 +71,7 @@ async def _run_loop():
     """Main vision loop. Runs until cancelled."""
     global _latest_description
 
-    # Initial delay — let OBS settle before first capture
+    # Initial delay - let OBS settle before first capture
     await asyncio.sleep(5.0)
 
     while True:

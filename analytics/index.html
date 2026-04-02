@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>The Party — Analytics</title>
+  <title>The Party - Analytics</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
@@ -205,7 +205,7 @@
 <body>
 
   <h1>THE PARTY</h1>
-  <div class="subtitle">Analytics Dashboard — The Dungeon Arcade</div>
+  <div class="subtitle">Analytics Dashboard - The Dungeon Arcade</div>
 
   <button id="refresh-btn" onclick="loadStats()">↺ REFRESH</button>
   <span id="last-updated"></span>
@@ -217,7 +217,7 @@
   </div>
 
   <div class="section">
-    <div class="section-title">Characters — Times Spoken</div>
+    <div class="section-title">Characters - Times Spoken</div>
     <div id="char-bars"></div>
   </div>
 
@@ -314,7 +314,7 @@
           .join('');
         const time = t.received_at
           ? new Date(t.received_at).toLocaleTimeString()
-          : '—';
+          : '-';
         tbody.innerHTML += `
           <tr>
             <td>${time}</td>

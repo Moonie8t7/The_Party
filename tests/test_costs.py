@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from party.providers.costs import estimate_cost, COST_PER_1K_INPUT, COST_PER_1K_OUTPUT
 
 
@@ -14,7 +14,7 @@ def test_estimate_cost_zero_tokens():
 
 
 def test_estimate_cost_unknown_provider():
-    # Unknown provider should not crash — uses fallback rate
+    # Unknown provider should not crash - uses fallback rate
     cost = estimate_cost("unknown_provider", input_tokens=1000, output_tokens=100)
     assert cost >= 0
 

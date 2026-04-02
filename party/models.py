@@ -1,4 +1,4 @@
-from enum import Enum
+﻿from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 from dataclasses import dataclass, field
@@ -116,7 +116,7 @@ class Character:
     display_name: str
     provider_type: str    # "anthropic" | "openai" | "gemini" | "grok" | "deepseek"
     model_id: str
-    voice_id: str         # ElevenLabs voice ID — set via settings.voice_*
+    voice_id: str         # ElevenLabs voice ID - set via settings.voice_*
     voice_settings: CharacterVoiceSettings = field(default_factory=CharacterVoiceSettings)
     prompt: str = ""               # loaded at startup
     context_supplement: str = ""   # appended to system prompt at call time
