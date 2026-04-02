@@ -70,8 +70,10 @@ def _capture_sync() -> Optional[str]:
     )
 
     try:
-        scene_response = client.get_current_program_scene()
-        scene_name = scene_response.current_program_scene_name
+        from party.context.obs_context import _get_scene_sync
+        scene_name = _get_scene_sync()
+        if not scene_name:
+            return None
 
         response = client.get_source_screenshot(
             scene_name,

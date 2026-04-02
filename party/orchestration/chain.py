@@ -1,4 +1,4 @@
-﻿import re
+import re
 import time
 from datetime import datetime
 from typing import Optional
@@ -12,6 +12,7 @@ from party.providers.deepseek import DeepSeekProvider
 from party.orchestration.router import _route_with_method
 from party.orchestration.repair import repair_response, SENTENCE_LIMITS
 from party.context.session import read_session_context
+from party.context.obs_context import get_current_scene
 from party.vision.loop import get_latest_description
 from party.vision.log import get_recent_entries
 from party.config import settings
@@ -20,7 +21,7 @@ from party.log import get_logger
 log = get_logger(__name__)
 
 
-def _build_context_preamble() -> str:
+async def _build_context_preamble() -> str:
     """
     Build the context preamble injected into every character call.
     Reads session_context.txt fresh on every call.
@@ -45,6 +46,10 @@ def _build_context_preamble() -> str:
     if recent:
         parts.append("Recent screen observations:")
         parts.extend(f"  {entry}" for entry in recent)
+
+    # OBS Scene Awareness
+    scene = await get_current_scene()
+    parts.append(f"Current OBS Scene: {scene}")
 
     return "\n".join(parts)
 
@@ -98,7 +103,7 @@ async def run_chain(
     companion_characters: names that receive the brief companion instruction.
     """
     results = []
-    session_snapshot = _build_context_preamble()
+    session_snapshot = await _build_context_preamble()
     context_messages = [{"role": "user", "content": f"The situation: {trigger.text}"}]
 
     for i, name in enumerate(character_names):

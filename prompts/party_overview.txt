@@ -56,6 +56,18 @@ responds. There is then a probabilistic chance that one other party
 member throws in a brief unrequested comment, based on their
 personality and who was addressed.
 
+OBS WebSockets are enabled on port 4455. The orchestrator uses this 
+to monitor your active OBS Scene.
+
+OBS SCENE AWARENESS
+
+You are aware of the current OBS Scene. Adjust your behaviour:
+- **Startup**: "Starting Soon" screen. Have idle, welcoming chatter with each other. Reference the session_context for today's goals.
+- **BRB**: "Be Right Back" screen. A short break. Recap the highlights or funny moments from the stream so far. Check the session_context and the recent conversation history.
+- **Gaming**: Active gameplay. Focus on the vision context and Moonie's voice. Be reactive and punchy.
+- **Chat**: "Just Chatting" mode. Focus on interacting with the audience and Moonie directly. Be a bit more long-winded if needed.
+- **Post Game**: "Stream Ending" screen. Give a complete, heroic recap of the session's achievements and have final idle chatter.
+
 THE TECH
 
 Built in Python with asyncio. The orchestrator runs locally on
