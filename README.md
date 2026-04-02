@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🗡️ The Party Orchestrator
-**A Next-Generation Multi-LLM Twitch Overlay System**
+**A Multi-LLM Twitch Overlay System**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
 [![OBS Studio](https://img.shields.io/badge/OBS-WebSockets-lightgrey.svg)](https://obsproject.com/)
@@ -11,28 +11,24 @@
 
 </div>
 
----
+<br>
 
-## 🌟 The Vision
+## The System
 
-**The Party** is an experimental, production-grade AI co-presence system designed for live Twitch streams. It replaces traditional "reactive soundboards" with a living, breathing ensemble of five distinct AI companions. 
+**The Party** is an AI co-presence system designed for live Twitch streams. It provides an ensemble of five distinct AI companions that react to stream events. 
 
-Each character is individually powered by a cutting-edge Large Language Model—representing a fusion of Anthropic, OpenAI, DeepSeek, Google, and xAI inside a single, synchronized conversational pipeline. They watch the stream, listen to the streamer, observe the gameplay, and dynamically interact with each other and the audience on-stream in pristine JRPG-style dialogue boxes.
+Each character is powered by a different Large Language Model, integrating Anthropic, OpenAI, DeepSeek, Google, and xAI via a synchronized conversational pipeline. They process stream events, streamer speech, and game visuals to dynamically interact with each other and the audience through on-stream dialogue boxes.
 
----
+## Core Features
 
-## ✨ Core Features
+* **Five-Model Ensemble Orchestration**: Routes responses through a cast of models (Claude Sonnet, GPT-4o, Gemini 2.5 Flash, DeepSeek, and Grok).
+* **Live Screen Reading**: Uses GPT-4o Vision in an asynchronous loop to capture bursts of gameplay frames and maintain a context description of broadcast visuals.
+* **Real-Time Voice Interception**: Translates streamer speech and routes triggers through a rules engine to determine the active speaker.
+* **Concurrent TTS Pipelining**: ElevenLabs voice generation occurs in background worker threads. The system synthesises the audio of the following response while the current audio is playing, minimizing inter-response latency.
+* **Context Loading Efficiency**: Utilizes a static snapshot architecture. Historical game data and vision logs are compiled into the System Prompt instead of message loops, lowering context token consumption over long sessions.
+* **Visual Overlay**: Displays an OBS Browser Source overlay with an auto-scrolling typewriter text format, aligned statically across the character portraits.
 
-* 🗣️ **Five-Model Ensemble Orchestration**: Seamlessly routes responses through a rotating cast of models (Claude Sonnet, GPT-4o, Gemini 2.5 Flash, DeepSeek, and Grok).
-* 👁️ **Live Screen Reading**: Powered by GPT-4o Vision, a background async loop captures bursts of gameplay frames and maintains a running narrative of what is actively visible on the broadcast.
-* 🎙️ **Real-Time Voice Interception**: Translates streamer speech instantly and routes triggers through a sophisticated rules engine to decide who speaks.
-* ⚡ **Zero-Latency TTS Pipelining**: ElevenLabs voice generation occurs in concurrent, background worker threads. The system synthesises the *second* character's audio while the *first* character is actively speaking, perfectly eliminating inter-response latency.
-* 🛡️ **AAA Context Compression**: Employs a robust static snapshot architecture. Historical game data and vision logs are efficiently compiled into the System Prompt instead of recursive message loops, dropping context token costs effectively to zero.
-* 🎮 **JRPG-Style Visual Overlay**: Features a pixel-perfect OBS Browser Source overlay with auto-scrolling typewriter text formats bridging 887px exactly across Character portraits.
-
----
-
-## ⚙️ Architecture
+## Architecture
 
 The orchestrator operates purely locally, connecting to **Streamer.bot** via UDP payloads and driving **OBS Studio** via websockets.
 
@@ -61,7 +57,7 @@ graph TD
     TTS --> OBSOut[OBS Browser UI]
 ```
 
-## 🚀 Quick Setup
+## Quick Setup
 
 1. **Clone & Install**
    ```bash
@@ -82,5 +78,5 @@ graph TD
    python -m party.main
    ```
 
----
-*© 2026 WatchMoonie. Built to push the boundary of AI stream interaction.*
+<br>
+*© 2026 WatchMoonie. Built for Twitch interactive streaming.*
