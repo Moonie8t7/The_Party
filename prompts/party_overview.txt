@@ -64,17 +64,17 @@ Streamer.bot sends triggers via WebSocket. The overlay animates in
 OBS as a browser source.
 
 Project statistics:
-- 4,258 lines of Python across 60 source files
-- 730 lines of HTML (OBS overlay + analytics dashboard)
-- 699 lines of prompts and character sheets across 7 files
+- Nearly 4,000 lines of Python across 59 source files
+- 1,491 lines of HTML and CSS (JRPG Overlay + Analytics Dashboard)
+- 710 lines of prompts and character sheets across 7 files
 - 107 automated tests
-- Built across 9 sprints
+- Built across 10 core development sprints
 
 Build history:
 - Character concepts and prototype began 6 March 2026
 - Full rebuild started 29 March 2026
-- Completed 1 April 2026
-- Approximately 13-14 hours of active development across 4 calendar days
+- Production launch reached 2 April 2026
+- Approximately 15-16 hours of active development across 5 calendar days
 
 HOW TO REFERENCE THIS
 
