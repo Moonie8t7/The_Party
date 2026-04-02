@@ -33,31 +33,34 @@ Each character is powered by a different Large Language Model, integrating Anthr
 
 ## Architecture
 
-The orchestrator operates purely locally, acting as a server that **Streamer.bot** connects to via WebSockets, whilst simultaneously driving **OBS Studio** via WebSockets.
+The orchestrator operates purely locally. It acts as a command server that **Streamer.bot** connects to via WebSockets, whilst simultaneously hosting a secondary WebSocket endpoint that the **OBS Browser Source** connects to for live visual updates.
 
 ```mermaid
 graph TD
-    Streamer[Streamer Voice] --> STT(STT Listener)
-    OBS[OBS WebSockets] --> Vision(Vision Capture Loop)
-    STT --> Router{Trigger Router}
-    Vision --> Router
-    
-    Router --> Chain(Orchestration Chain)
-    
-    Chain --> Claude[Claude API]
-    Chain --> GPT[OpenAI API]
-    Chain --> Gemini[Gemini API]
-    Chain --> Grok[Grok API]
-    Chain --> DeepSeek[DeepSeek API]
-    
-    Claude --> Repair(Length Enforcement)
-    GPT --> Repair
-    Gemini --> Repair
-    Grok --> Repair
-    DeepSeek --> Repair
-    
-    Repair --> TTS(ElevenLabs Pipelining)
-    TTS --> OBSOut[OBS Browser UI]
+    subgraph Intake Layer
+        SB[Streamer.bot] --> WS(WebSocket Server)
+        Mic[Streamer Mic] --> STT(Whisper STT)
+    end
+
+    subgraph Core Orchestration
+        WS --> Queue[Priority Queue]
+        STT --> Queue
+        Queue --> Router{Trigger Router}
+        
+        Vision(Vision Capture Loop) -. Context .-> Chain
+        Router --> Chain[Orchestration Chain]
+        
+        Chain <--> Models((5x LLM APIs))
+        Chain --> Repair[Response Formatting]
+    end
+
+    subgraph Output Layer
+        Repair --> TTS[ElevenLabs Pipelining]
+        Repair --> UI[Overlay Server]
+        
+        TTS --> VoiceOut((Audio Playback))
+        UI --> Overlay[OBS Browser Source]
+    end
 ```
 
 ## Quick Setup
