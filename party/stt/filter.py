@@ -1,4 +1,4 @@
-﻿"""
+"""
 STT reaction filter.
 
 A single fast LLM call that decides whether a transcribed utterance
@@ -17,6 +17,7 @@ FILTER_PROMPT = """You are monitoring a Twitch streamer's microphone.
 Your job is to decide if what they just said warrants a reaction from their AI party members.
 
 Say YES if the streamer:
+- Addresses the party or a specific character directly (e.g. 'party', 'Clauven', 'Grokthar')
 - Had a strong emotional reaction to something in the game (surprise, frustration, excitement, fear)
 - Said something interesting or questionable about what they're doing or planning
 - Made an observation worth responding to

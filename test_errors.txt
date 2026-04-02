@@ -1,0 +1,147 @@
+...FFF...................................................F.............. [ 67%]
+..............FFF.F....F...........                                      [100%]
+================================== FAILURES ===================================
+_____________ test_chain_passes_context_to_subsequent_characters ______________
+tests\test_chain.py:101: in test_chain_passes_context_to_subsequent_characters
+    await run_chain(trigger, characters)
+party\orchestration\chain.py:114: in run_chain
+    response = await call_character(character, session_snapshot, context_messages)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:2337: in _execute_mock_call
+    result = await effect(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: test_chain_passes_context_to_subsequent_characters.<locals>.capture_call() takes 2 positional arguments but 3 were given
+---------------------------- Captured stdout call -----------------------------
+2026-04-02 16:26:28 [info     ] provider.call_start            character=grokthar provider=grok trigger_id=481b1cf0-db5d-4da6-89dd-6419fdf161a6
+_________ test_chain_applies_companion_closing_to_companion_character _________
+tests\test_chain.py:123: in test_chain_applies_companion_closing_to_companion_character
+    await run_chain(trigger, characters, companion_characters={"geptima"})
+party\orchestration\chain.py:114: in run_chain
+    response = await call_character(character, session_snapshot, context_messages)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:2337: in _execute_mock_call
+    result = await effect(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: test_chain_applies_companion_closing_to_companion_character.<locals>.capture_call() takes 2 positional arguments but 3 were given
+---------------------------- Captured stdout call -----------------------------
+2026-04-02 16:26:28 [info     ] provider.call_start            character=grokthar provider=grok trigger_id=63ae194a-d1ed-4fec-9818-4504f5615c2a
+___________ test_chain_applies_normal_closing_when_no_companion_set ___________
+tests\test_chain.py:149: in test_chain_applies_normal_closing_when_no_companion_set
+    await run_chain(trigger, characters, companion_characters=None)
+party\orchestration\chain.py:114: in run_chain
+    response = await call_character(character, session_snapshot, context_messages)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:2337: in _execute_mock_call
+    result = await effect(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: test_chain_applies_normal_closing_when_no_companion_set.<locals>.capture_call() takes 2 positional arguments but 3 were given
+---------------------------- Captured stdout call -----------------------------
+2026-04-02 16:26:28 [info     ] provider.call_start            character=grokthar provider=grok trigger_id=4d1cce48-d08a-40dd-9f6d-72e4f15bd429
+______________ test_repair_detects_length_violation_for_geptima _______________
+tests\test_repair.py:67: in test_repair_detects_length_violation_for_geptima
+    assert result.sentence_count == 5
+E   AssertionError: assert 3 == 5
+E    +  where 3 = RepairResult(text='Right, so that is a lot to process. We have seen this before in many forms. The pattern is always the same.', repaired=True, changes=['hard_trimmed_length'], sentence_count=3, length_violation=True).sentence_count
+___________________ test_placeholder_speak_when_no_api_key ____________________
+tests\test_tts.py:14: in test_placeholder_speak_when_no_api_key
+    await tts.speak("Hello world.", "PLACEHOLDER_VOICE", "grokthar")
+          ^^^^^^^^^
+E   AttributeError: module 'party.output.tts' has no attribute 'speak'
+___________________ test_elevenlabs_called_when_api_key_set ___________________
+tests\test_tts.py:26: in test_elevenlabs_called_when_api_key_set
+    with patch("party.output.tts._elevenlabs_speak", new_callable=AsyncMock) as mock_el:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'party.output.tts' from 'D:\\OBS\\The Party\\party\\output\\tts.py'> does not have the attribute '_elevenlabs_speak'
+______________ test_elevenlabs_failure_falls_back_to_placeholder ______________
+tests\test_tts.py:37: in test_elevenlabs_failure_falls_back_to_placeholder
+    with patch(
+C:\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'party.output.tts' from 'D:\\OBS\\The Party\\party\\output\\tts.py'> does not have the attribute '_elevenlabs_speak'
+___________________________ test_speak_never_raises ___________________________
+tests\test_tts.py:69: in test_speak_never_raises
+    with patch(
+C:\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'party.output.tts' from 'D:\\OBS\\The Party\\party\\output\\tts.py'> does not have the attribute '_elevenlabs_speak'
+_______________ test_speak_passes_voice_settings_to_elevenlabs ________________
+tests\test_tts.py:123: in test_speak_passes_voice_settings_to_elevenlabs
+    with patch("party.output.tts._elevenlabs_speak", new_callable=AsyncMock) as mock_el:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'party.output.tts' from 'D:\\OBS\\The Party\\party\\output\\tts.py'> does not have the attribute '_elevenlabs_speak'
+============================== warnings summary ===============================
+C:\Python314\Lib\site-packages\google\genai\types.py:43
+  C:\Python314\Lib\site-packages\google\genai\types.py:43: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+tests/test_chain.py::test_chain_returns_responses_for_all_characters
+tests/test_chain.py::test_chain_skips_failed_provider
+tests/test_chain.py::test_chain_returns_empty_if_all_providers_fail
+tests/test_chain.py::test_chain_passes_context_to_subsequent_characters
+tests/test_chain.py::test_chain_applies_companion_closing_to_companion_character
+tests/test_chain.py::test_chain_applies_normal_closing_when_no_companion_set
+  D:\OBS\The Party\tests\test_chain.py:13: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    received_at=datetime.utcnow(),
+
+tests/test_intake.py::test_intake_accepts_valid_hotkey
+tests/test_intake.py::test_intake_accepts_valid_chat_trigger
+tests/test_intake.py::test_intake_assigns_trigger_id
+tests/test_models.py::test_trigger_assigns_id_automatically
+  C:\Python314\Lib\site-packages\pydantic\main.py:250: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_router.py::test_router_death_keywords
+tests/test_router.py::test_router_lore_keywords
+tests/test_router.py::test_router_combat_keywords
+tests/test_router.py::test_router_chat_keywords
+tests/test_router.py::test_router_technical_keywords
+tests/test_router.py::test_router_llm_fallback_on_no_match
+tests/test_router.py::test_router_default_cast_on_llm_failure
+tests/test_router.py::test_router_returns_valid_character_names_only
+  D:\OBS\The Party\tests\test_router.py:12: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    received_at=datetime.utcnow(),
+
+tests/test_scheduler.py: 28 warnings
+  D:\OBS\The Party\tests\test_scheduler.py:17: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    received_at=datetime.utcnow(),
+
+tests/test_scheduler.py: 28 warnings
+  D:\OBS\The Party\party\queue\scheduler.py:46: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_transcript.py::test_transcript_writes_valid_jsonl
+tests/test_transcript.py::test_transcript_appends_multiple_entries
+tests/test_transcript.py::test_transcript_appends_multiple_entries
+tests/test_transcript.py::test_transcript_appends_multiple_entries
+tests/test_transcript.py::test_transcript_creates_directory_if_missing
+  D:\OBS\The Party\tests\test_transcript.py:14: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    received_at=datetime.utcnow(),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_chain.py::test_chain_passes_context_to_subsequent_characters
+FAILED tests/test_chain.py::test_chain_applies_companion_closing_to_companion_character
+FAILED tests/test_chain.py::test_chain_applies_normal_closing_when_no_companion_set
+FAILED tests/test_repair.py::test_repair_detects_length_violation_for_geptima
+FAILED tests/test_tts.py::test_placeholder_speak_when_no_api_key - AttributeE...
+FAILED tests/test_tts.py::test_elevenlabs_called_when_api_key_set - Attribute...
+FAILED tests/test_tts.py::test_elevenlabs_failure_falls_back_to_placeholder
+FAILED tests/test_tts.py::test_speak_never_raises - AttributeError: <module '...
+FAILED tests/test_tts.py::test_speak_passes_voice_settings_to_elevenlabs - At...
+9 failed, 98 passed, 80 warnings in 8.11s

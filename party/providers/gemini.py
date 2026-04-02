@@ -38,7 +38,7 @@ class GeminiProvider(BaseProvider):
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=full_prompt,
-                        max_output_tokens=400,
+                        max_output_tokens=800,
                     ),
                 ),
             )
