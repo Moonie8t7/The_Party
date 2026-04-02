@@ -26,7 +26,8 @@ Each character is powered by a different Large Language Model, integrating Anthr
 
 * **Five-Model Ensemble Orchestration**: Routes responses through a cast of models (Claude Sonnet, GPT-4o, Gemini 2.5 Flash, DeepSeek, and Grok).
 * **Live Screen Reading**: Uses GPT-4o Vision in an asynchronous loop to capture bursts of gameplay frames and maintain a context description of broadcast visuals.
-* **Real-Time Voice Interception**: Translates streamer speech and routes triggers through a rules engine to determine the active speaker.
+* **Hardened Voice Triggers**: Utilizes a custom phonetic and fuzzy matching engine (116 tests passing) to intercept streamer speech and route triggers with high precision.
+* **Autonomous Idle Interaction**: An intelligent background coordinator that monitors stream activity and triggers natural, in-character banter during idle moments (Startup, BRB, etc.).
 * **Concurrent TTS Pipelining**: ElevenLabs voice generation occurs in background worker threads. The system synthesises the audio of the following response while the current audio is playing, minimizing inter-response latency.
 * **Context Loading Efficiency**: Utilizes a static snapshot architecture. Historical game data and vision logs are compiled into the System Prompt instead of message loops, lowering context token consumption over long sessions.
 * **Visual Overlay**: Displays an OBS Browser Source overlay with an auto-scrolling typewriter text format, aligned statically across the character portraits.
