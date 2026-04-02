@@ -119,7 +119,10 @@ async def main():
     await idle_coordinator.start()
 
     # 6c. Start STT coordinator
-    stt_coordinator = STTCoordinator(enqueue_fn=scheduler.enqueue)
+    stt_coordinator = STTCoordinator(
+        enqueue_fn=scheduler.enqueue,
+        poke_fn=scheduler.poke_activity
+    )
     if settings.stt_enabled:
         await stt_coordinator.start()
         log.info("startup.stt_started", model=settings.stt_model)

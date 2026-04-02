@@ -37,6 +37,10 @@ class Scheduler:
     def get_last_activity_time(self) -> datetime:
         return self.last_activity_time
 
+    def poke_activity(self) -> None:
+        """Manual activity refresh (e.g. from STT even if not reacting)."""
+        self.last_activity_time = datetime.utcnow()
+
     def set_handler(self, fn: Callable[[Trigger], Awaitable]) -> None:
         self._handler = fn
 

@@ -7,7 +7,7 @@ from party.log import get_logger
 
 log = get_logger(__name__)
 
-IDLE_SCENES = {"Startup", "BRB", "Post Game"}
+IDLE_SCENES = {"Startup", "BRB", "Post Game", "Chat"}
 IDLE_THRESHOLD_SECONDS = 60.0
 
 class IdleCoordinator:
@@ -15,6 +15,7 @@ class IdleCoordinator:
         self.scheduler = scheduler
         self._running = False
         self._task = None
+        self._check_count = 0
 
     async def start(self):
         if self._running:
@@ -36,6 +37,7 @@ class IdleCoordinator:
     async def _loop(self):
         while self._running:
             await asyncio.sleep(10.0)  # Check every 10 seconds
+            self._check_count += 1
             
             # Check scene
             try:
@@ -43,13 +45,17 @@ class IdleCoordinator:
             except Exception:
                 scene = "Unknown"
                 
-            if scene not in IDLE_SCENES:
-                continue
-                
             # Check last activity
             last_activity = self.scheduler.get_last_activity_time()
             elapsed = (datetime.utcnow() - last_activity).total_seconds()
             
+            # Log status every 3 checks (30s)
+            if self._check_count % 3 == 0:
+                log.info("idle.status_check", scene=scene, elapsed_seconds=int(elapsed), in_idle_scene=(scene in IDLE_SCENES))
+
+            if scene not in IDLE_SCENES:
+                continue
+                
             if elapsed >= IDLE_THRESHOLD_SECONDS:
                 log.info("idle.triggering_chatter", scene=scene, elapsed_seconds=int(elapsed))
                 trigger = Trigger(

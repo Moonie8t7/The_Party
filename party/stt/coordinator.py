@@ -17,17 +17,21 @@ log = get_logger(__name__)
 
 
 class STTCoordinator:
-    def __init__(self, enqueue_fn):
+    def __init__(self, enqueue_fn, poke_fn=None):
         """
         enqueue_fn: async callable that accepts a Trigger.
-        Should be the scheduler's enqueue method.
+        poke_fn: callable that updates activity status.
         """
         self._enqueue = enqueue_fn
+        self._poke_fn = poke_fn
         self._last_stt_trigger = 0.0
         self._listener = STTListener(on_utterance=self._handle_utterance)
 
     async def _handle_utterance(self, text: str):
         """Handle a transcribed utterance from the STT listener."""
+        if self._poke_fn:
+            self._poke_fn()
+
         # Check STT cooldown
         now = time.monotonic()
         elapsed = now - self._last_stt_trigger

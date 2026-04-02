@@ -1,8 +1,9 @@
 import re
 import time
+import os
 from datetime import datetime
 from typing import Optional
-from party.models import Trigger, Scene, Character, CharacterResponse, CHARACTERS
+from party.models import Trigger, Scene, Character, CharacterResponse, CHARACTERS, TriggerType
 from party.providers.base import ProviderError
 from party.providers.anthropic import AnthropicProvider
 from party.providers.openai import OpenAIProvider

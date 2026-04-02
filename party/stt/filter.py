@@ -10,6 +10,7 @@ import asyncio
 from anthropic import Anthropic
 from party.config import settings
 from party.log import get_logger
+from party.context.phonetics import is_direct_address
 
 log = get_logger(__name__)
 
@@ -37,8 +38,21 @@ Respond with ONLY the word YES or NO. Nothing else."""
 async def should_react(utterance: str) -> bool:
     """
     Returns True if the utterance warrants a party reaction.
-    Fast Haiku call - should complete in under 1 second.
+    Fast check for direct address, then Haiku fallback.
     """
+    # Fast path: Always react if it's a direct address (hey party, etc.)
+    res = is_direct_address(utterance)
+    if res["matched"]:
+        log.info(
+            "stt.filter_decision",
+            result="react",
+            reason="direct_address",
+            target=res["target"],
+            type=res["match_type"],
+            utterance=utterance[:60]
+        )
+        return True
+
     try:
         client = Anthropic(api_key=settings.anthropic_api_key)
         loop = asyncio.get_event_loop()

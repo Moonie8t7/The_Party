@@ -5,6 +5,12 @@ from anthropic import Anthropic
 from party.config import settings
 from party.models import Trigger, CHARACTERS, DirectAddressResult, TriggerType
 from party.log import get_logger
+from party.context.phonetics import (
+    CHARACTER_NAMES,
+    PHONETIC_ALIASES,
+    is_direct_address as detect_phonetic_address,
+    PhoneticMatchResult
+)
 
 log = get_logger(__name__)
 
@@ -253,29 +259,6 @@ ROUTING_RULES = [
 ]
 
 
-# ── Direct address detection ─────────────────────────────────────────────────
-
-_DIRECT_ADDRESS_PATTERNS = [
-    r"^({name})[,:\-\s]",
-    r"\b(?:hey|ask)[\s]({name})\b",
-    r"(?:^|\s)@({name})\b",
-    r"\b({name})[,:]",
-]
-
-_CHARACTER_NAMES = ["clauven", "geptima", "gemaux", "grokthar", "deepwilla"]
-
-# Phonetic aliases to handle STT variances (Whisper prompts help, but these provide safety)
-PHONETIC_ALIASES = {
-    "clauven": ["clorvin", "clovin", "clovan", "cloven", "clover"],
-    "deepwilla": ["deepwiller", "deepvilla", "deepwillow", "deep villa"],
-    "geptima": ["septima", "geptema", "geptimma"],
-    "gemaux": ["gemmo", "gem-o", "gemmo", "gemauto", "gemo"],
-    "grokthar": ["grok-thar", "grokthor", "grockthar"],
-}
-
-# Group aliases that trigger multiple characters
-GROUP_ALIASES = ["party", "everyone", "all of you", "the party", "guys"]
-
 # COMPANION_PROBABILITIES[primary] = [(companion, probability), ...]
 # Listed in priority order - first to pass speaks
 COMPANION_PROBABILITIES: dict[str, list[tuple[str, float]]] = {
@@ -317,52 +300,34 @@ COMPANION_GLOBAL_CHANCE = 0.50
 def detect_direct_address(text: str) -> DirectAddressResult:
     """
     Check if the trigger text is directly addressing a specific character or the whole party.
-    Returns DirectAddressResult with detected=False if no match.
+    Uses centralized phonetic engine for robust detection.
     """
-    text_lower = text.lower().strip()
-
-    # 1. Check for group address (e.g. "Hey party")
-    for group in GROUP_ALIASES:
-        if re.search(fr"\b(?:hey|ask|yo)?[\s]?{group}\b", text_lower):
-            # Special case: use a random character as primary, and everyone as candidate
-            primary = random.choice(_CHARACTER_NAMES)
-            other_chars = [c for c in _CHARACTER_NAMES if c != primary]
-            return DirectAddressResult(
-                detected=True,
-                primary=primary,
-                # For group chat, we want high probability for others to join
-                companion_candidates=[(c, 0.90) for c in other_chars],
-            )
-
-    # 2. Check for specific character address (including phonetic aliases)
-    for name in _CHARACTER_NAMES:
-        # Check primary name and aliases
-        candidates = [name] + PHONETIC_ALIASES.get(name, [])
-        for candidate in candidates:
-            for pattern_template in _DIRECT_ADDRESS_PATTERNS:
-                pattern = pattern_template.format(name=re.escape(candidate))
-                if re.search(pattern, text_lower):
-                    return DirectAddressResult(
-                        detected=True,
-                        primary=name,
-                        companion_candidates=COMPANION_PROBABILITIES[name],
-                    )
-
-    return DirectAddressResult(
-        detected=False,
-        primary=None,
-        companion_candidates=[],
-    )
+    res = detect_phonetic_address(text)
+    if not res["matched"]:
+        return DirectAddressResult(detected=False, primary=None, companion_candidates=[])
+    
+    if res["is_group"]:
+        # Group addressed - pick a primary but allow others to join with high probability
+        primary = random.choice(CHARACTER_NAMES)
+        other_chars = [c for c in CHARACTER_NAMES if c != primary]
+        return DirectAddressResult(
+            detected=True,
+            primary=primary,
+            companion_candidates=[(c, 0.90) for c in other_chars],
+        )
+    else:
+        # Specific character addressed
+        name = res["target"]
+        return DirectAddressResult(
+            detected=True,
+            primary=name,
+            companion_candidates=COMPANION_PROBABILITIES[name],
+        )
 
 
 def resolve_companions(result: DirectAddressResult) -> list[str]:
     """
     Given a DirectAddressResult, probabilistically select companions.
-    Returns a list of companion names.
-
-    Two-stage:
-    1. Global gate (50%) - if fails, nobody else comments (unless group address)
-    2. Per-character probability - all candidates who pass their roll speak
     """
     if not result.detected:
         return []
@@ -383,9 +348,8 @@ def resolve_companions(result: DirectAddressResult) -> list[str]:
 
 
 async def _llm_route(trigger_id: str, trigger_text: str) -> list[str]:
-    """LLM fallback routing. Extracted for testability."""
+    """LLM fallback routing."""
     import asyncio
-
     loop = asyncio.get_event_loop()
     client = Anthropic(api_key=settings.anthropic_api_key)
 
@@ -419,30 +383,23 @@ Example: ["grokthar", "clauven"]"""
     raw = response.content[0].text.strip()
     match = re.search(r"\[.*?\]", raw)
     if match:
-        characters = json.loads(match.group())
-        characters = [c for c in characters if c in CHARACTERS]
-        if characters:
-            return characters
+        result_chars = json.loads(match.group())
+        result_chars = [c for c in result_chars if c in CHARACTERS]
+        if result_chars:
+            return result_chars
 
     raise ValueError("LLM returned no valid character names")
 
 
 async def route_trigger(trigger: Trigger) -> list[str]:
-    """
-    Public router interface. Returns ordered list of character names.
-    Used by tests and external callers.
-    """
-    characters, _, _companion_set = await _route_with_method(trigger)
+    """Public router interface."""
+    characters, _, _ = await _route_with_method(trigger)
     return characters
 
 
 async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]]:
-    """
-    Internal router. Returns (characters, method, companion_set) where method is
-    "rule" | "llm" | "default" | "direct_address" | "idle". Used by chain.py.
-    """
+    """Internal router logic."""
     if trigger.type == TriggerType.IDLE:
-        # Pick 2-3 random characters for idle chatter
         all_chars = list(CHARACTERS.keys())
         random.shuffle(all_chars)
         count = random.randint(2, 3)
@@ -450,7 +407,7 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
         log.info("router.idle_select", trigger_id=trigger.trigger_id, characters=characters)
         return characters, "idle", set()
 
-    # ── Direct address check - runs before all other routing ──────────
+    # ── Direct address check ──────────
     direct = detect_direct_address(trigger.text)
     if direct.detected:
         companions = resolve_companions(direct)
@@ -465,9 +422,8 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
         )
         return characters, "direct_address", companion_set
 
-    # ── Existing routing logic below - unchanged ───────────────────────
+    # ── Rule-based routing ──────────
     text_lower = trigger.text.lower()
-
     for idx, rule in enumerate(ROUTING_RULES):
         if any(kw in text_lower for kw in rule["keywords"]):
             characters = rule["characters"]
@@ -479,7 +435,7 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
             )
             return characters, "rule", set()
 
-    # LLM fallback
+    # ── LLM fallback ──────────
     log.info("router.llm_fallback_attempt", trigger_id=trigger.trigger_id)
     try:
         characters = await _llm_route(trigger.trigger_id, trigger.text)
