@@ -35,10 +35,11 @@ Say NO if the streamer:
 Respond with ONLY the word YES or NO. Nothing else."""
 
 
-async def should_react(utterance: str) -> bool:
+async def should_react(utterance: str, scene: str = "Unknown") -> bool:
     """
     Returns True if the utterance warrants a party reaction.
     Fast check for direct address, then Haiku fallback.
+    Sensitivity is reduced if scene is 'Gaming'.
     """
     # Fast path: Always react if it's a direct address (hey party, etc.)
     res = is_direct_address(utterance)
@@ -53,9 +54,16 @@ async def should_react(utterance: str) -> bool:
         )
         return True
 
+    # If in Gaming scene and no direct address, we are MUCH more restrictive
+    is_gaming = (scene == "Gaming")
+    
     try:
         client = Anthropic(api_key=settings.anthropic_api_key)
         loop = asyncio.get_event_loop()
+
+        prompt = FILTER_PROMPT
+        if is_gaming:
+            prompt += "\n\nCRITICAL: The streamer is currently playing a game. Be extremely selective. ONLY say YES if this is a major game event, an intense emotional reaction, or a direct question. If they are just providing routine commentary, say NO."
 
         response = await asyncio.wait_for(
             loop.run_in_executor(
@@ -63,7 +71,7 @@ async def should_react(utterance: str) -> bool:
                 lambda: client.messages.create(
                     model=settings.stt_reaction_model,
                     max_tokens=5,
-                    system=FILTER_PROMPT,
+                    system=prompt,
                     messages=[{"role": "user", "content": utterance}],
                 ),
             ),
@@ -76,6 +84,7 @@ async def should_react(utterance: str) -> bool:
         log.info(
             "stt.filter_decision",
             result="react" if result else "ignore",
+            scene=scene,
             utterance=utterance[:60],
         )
         return result

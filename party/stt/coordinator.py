@@ -9,6 +9,7 @@ import asyncio
 import time
 from party.stt.listener import STTListener
 from party.stt.filter import should_react
+from party.context.obs_context import get_current_scene
 from party.models import Trigger, TriggerType, TriggerPriority
 from party.config import settings
 from party.log import get_logger
@@ -44,8 +45,13 @@ class STTCoordinator:
             )
             return
 
-        # Run reaction filter
-        react = await should_react(text)
+        # Run reaction filter with scene awareness
+        try:
+            scene = await get_current_scene()
+        except:
+            scene = "Unknown"
+            
+        react = await should_react(text, scene=scene)
         if not react:
             return
 

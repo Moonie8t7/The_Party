@@ -325,7 +325,7 @@ def detect_direct_address(text: str) -> DirectAddressResult:
         )
 
 
-def resolve_companions(result: DirectAddressResult) -> list[str]:
+def resolve_companions(result: DirectAddressResult, scene: str = "Unknown") -> list[str]:
     """
     Given a DirectAddressResult, probabilistically select companions.
     """
@@ -335,13 +335,19 @@ def resolve_companions(result: DirectAddressResult) -> list[str]:
     # If it's a group address (determined by high probabilities in candidates),
     # we skip the global gate or use a much higher one.
     is_group = any(p > 0.8 for _, p in result.companion_candidates)
+    
+    # If in Gaming scene, we are MUCH less likely to have companions
+    is_gaming = (scene == "Gaming")
+    global_chance = 0.15 if is_gaming else COMPANION_GLOBAL_CHANCE
 
-    if not is_group and random.random() >= COMPANION_GLOBAL_CHANCE:
+    if not is_group and random.random() >= global_chance:
         return []
 
     companions = []
     for companion_name, probability in result.companion_candidates:
-        if random.random() < probability:
+        # Scale individual probabilities down in gaming scene
+        effective_prob = probability * 0.4 if is_gaming else probability
+        if random.random() < effective_prob:
             companions.append(companion_name)
 
     return companions
@@ -410,7 +416,12 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
     # ── Direct address check ──────────
     direct = detect_direct_address(trigger.text)
     if direct.detected:
-        companions = resolve_companions(direct)
+        try:
+            scene = await get_current_scene()
+        except:
+            scene = "Unknown"
+            
+        companions = resolve_companions(direct, scene=scene)
         characters = [direct.primary] + companions
         companion_set = set(companions)
 
