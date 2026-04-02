@@ -64,7 +64,9 @@ def test_repair_detects_length_violation_for_geptima():
     )
     result = repair_response(long_response, character_name="geptima")
     assert result.length_violation is True
-    assert result.sentence_count == 5
+    assert result.sentence_count == 3
+    assert result.repaired is True
+    assert "What matters is what we do next." not in result.text
 
 
 def test_repair_no_violation_within_limit():

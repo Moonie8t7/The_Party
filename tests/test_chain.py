@@ -91,7 +91,7 @@ async def test_chain_passes_context_to_subsequent_characters():
     characters = ["grokthar", "geptima"]
     calls = []
 
-    async def capture_call(character, messages):
+    async def capture_call(character, session_snapshot, messages):
         calls.append((character.name, messages))
         if character.name == "grokthar":
             return mock_response("grokthar", "Grokthar", "Told you so.")
@@ -113,7 +113,7 @@ async def test_chain_applies_companion_closing_to_companion_character():
     characters = ["grokthar", "geptima"]
     calls = []
 
-    async def capture_call(character, messages):
+    async def capture_call(character, session_snapshot, messages):
         calls.append((character.name, messages))
         if character.name == "grokthar":
             return mock_response("grokthar", "Grokthar", "At least seven times.")
@@ -139,7 +139,7 @@ async def test_chain_applies_normal_closing_when_no_companion_set():
     characters = ["grokthar", "geptima"]
     calls = []
 
-    async def capture_call(character, messages):
+    async def capture_call(character, session_snapshot, messages):
         calls.append((character.name, messages))
         if character.name == "grokthar":
             return mock_response("grokthar", "Grokthar", "Told you so.")
