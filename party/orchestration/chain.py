@@ -70,13 +70,14 @@ async def _build_context_preamble() -> str:
 COMPANION_CLOSING = (
     "You are making a brief unrequested side comment - 1 sentence maximum. "
     "You were not directly asked. React naturally and instinctively to what "
-    "{primary} just said. Do not repeat, summarise, or agree with them. "
-    "Just your honest gut reaction. One sentence. Then stop."
+    "Now add a brief (1 sentence) unrequested comment to the conversation. "
+    "Acknowledge what was just said. Use natural social recall for any past events."
 )
 
 NORMAL_CLOSING = (
     "Now respond as your character, aware of the current context "
-    "and what your party members just said."
+    "and what your party members just said. Use natural social recall for any "
+    "past events—do not recite dates or exact log entries."
 )
 
 
