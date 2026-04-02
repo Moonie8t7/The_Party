@@ -1,0 +1,18 @@
+.env
+logs/
+session/session_context.txt
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# AI Dev & Internal Backups
+CLAUDE.md
+THE_PARTY_BRIEF.md
+TRACKER.md
+*_Backup.*

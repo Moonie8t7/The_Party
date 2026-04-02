@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(timeout 5 python -m party.main)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8765)",
+      "Bash(taskkill /PID 3448 /F)",
+      "Bash(taskkill //PID 3448 //F)",
+      "Bash(timeout 6 python -m party.main)",
+      "Bash(where wscat:*)",
+      "Bash(python -c \"import websockets; print\\(websockets.__version__\\); import websockets.legacy.server; print\\(''legacy ok''\\)\")",
+      "Bash(python -c \":*)",
+      "Read(//tmp/**)",
+      "Bash(python -c \"import sys,json; data=json.loads\\(sys.stdin.read\\(\\)\\); print\\(''''trigger_id:'''', data[''''trigger_id'''']\\); print\\(''''type:'''', data[''''type'''']\\); print\\(''''router_method:'''', data[''''router_method'''']\\); print\\(''''characters:'''', data[''''characters'''']\\); print\\(''''responses:'''', len\\(data[''''responses'''']\\)\\); print\\(''''total_latency_ms:'''', data[''''total_latency_ms'''']\\); print\\(''''error:'''', data[''''error'''']\\)\")",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -c \"import sys,json; d=json.loads\\(sys.stdin.read\\(\\)\\); print\\(''''error:'''', d.get\\(''''error''''\\)\\); print\\(''''responses:'''', len\\(d.get\\(''''responses'''',[]\\)\\)\\)\")",
+      "Bash(python -c \"import sounddevice; import soundfile; import numpy; print\\(''all ok''\\)\")",
+      "Bash(python -c \"import elevenlabs; print\\(''elevenlabs ok''\\)\")",
+      "Bash(python -m pytest tests/ -v --tb=short)",
+      "Bash(pip show:*)",
+      "Bash(powershell -Command \":*)",
+      "Bash(powershell -Command \"\\(Get-ChildItem -Path . -Filter ''SPRINT*.md''\\).Count\")",
+      "Bash(\"d:/OBS/The Party/tests/test_models.py\")",
+      "Bash(powershell -Command ':*)"
+    ]
+  }
+}

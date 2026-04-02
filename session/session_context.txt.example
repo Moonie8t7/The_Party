@@ -1,0 +1,18 @@
+# Session Context — The Party
+# This file is hot-reloaded on every trigger. Edit anytime mid-stream.
+# Lines starting with # are ignored.
+# Auto-populated fields (DATE, TIME, GAME, GAME_SUMMARY, STREAM_TITLE)
+# are overwritten at startup. Do not edit those lines manually.
+
+DATE: [auto]
+TIME: [auto]
+STREAM_TITLE: [auto]
+GAME: [auto]
+GAME_SUMMARY: [auto]
+
+# ── Add your session notes below this line ──────────────────────────
+
+CURRENT_OBJECTIVE:
+NOTABLE_MOMENTS:
+NPC_NOTES:
+PARTY_NOTES:

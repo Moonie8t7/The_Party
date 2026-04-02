@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>The Party — Overlay</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'Press Start 2P', monospace;
+    }
+
+    /* ── RPG Speech Panel ──────────────────────────────── */
+
+    #speech-panel {
+      position: absolute;
+      bottom: 220px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 887px; /* matches exact edge-to-edge of party portraits */
+      height: 140px; /* fixed height layout */
+      background: rgba(10, 8, 6, 0.95);
+      border: 3px solid #CC5500;
+      box-shadow: 0 0 15px rgba(204, 85, 0, 0.25), inset 0 0 15px rgba(0,0,0,0.9);
+      padding: 16px 20px;
+      border-radius: 2px;
+      opacity: 0;
+      transition: opacity 0.25s ease, bottom 0.25s ease;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #speech-panel.visible {
+      opacity: 1;
+      bottom: 240px;
+    }
+
+    #speech-name {
+      color: #CC5500;
+      font-size: 10px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 2px solid rgba(204, 85, 0, 0.3);
+      padding-bottom: 6px;
+      display: inline-block;
+    }
+
+    #speech-text {
+      color: #e4d8c5;
+      font-size: 14px;
+      line-height: 1.6;
+      word-wrap: break-word;
+      position: relative;
+      max-height: 68px; /* ~3 lines */
+      overflow-y: hidden;
+    }
+
+    /* Variant for companion comments */
+    #speech-panel.companion {
+      width: 550px;
+      height: 100px;
+      border-width: 2px;
+      padding: 12px 16px;
+    }
+    #speech-panel.companion #speech-name {
+      font-size: 8px;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+    }
+    #speech-panel.companion #speech-text {
+      font-size: 10px;
+      line-height: 1.6;
+    }
+
+    /* ── Party Bar ─────────────────────────────────────── */
+
+    #party-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 210px;
+      background: linear-gradient(
+        to top,
+        rgba(10, 8, 6, 0.96) 0%,
+        rgba(10, 8, 6, 0.82) 65%,
+        transparent 100%
+      );
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 28px;
+      padding: 0 60px 22px;
+    }
+
+    /* ── Portrait Card ─────────────────────────────────── */
+
+    .portrait {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      width: 155px;
+      opacity: 0.52;
+      transition: opacity 0.25s ease;
+      position: relative;
+    }
+
+    .portrait.speaking {
+      opacity: 1.0;
+    }
+
+    /* Portrait frame */
+    .portrait-frame {
+      width: 120px;
+      height: 120px;
+      border: 3px solid #3a2e1e;
+      background: #0a0806;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .portrait.speaking .portrait-frame {
+      border-color: #CC5500;
+      box-shadow:
+        0 0 10px #CC5500,
+        0 0 24px rgba(204, 85, 0, 0.45),
+        inset 0 0 10px rgba(204, 85, 0, 0.08);
+    }
+
+    /* Corner pixel accents */
+    .portrait-frame::before,
+    .portrait-frame::after {
+      content: '';
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      background: #CC5500;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      z-index: 3;
+    }
+    .portrait-frame::before { top: -1px; left: -1px; }
+    .portrait-frame::after  { bottom: -1px; right: -1px; }
+    .portrait.speaking .portrait-frame::before,
+    .portrait.speaking .portrait-frame::after { opacity: 1; }
+
+    /* Animation wrapper — handles speaking movement without disturbing flip */
+    .portrait-anim-wrapper {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* Portrait image */
+    .portrait-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center top;
+      image-rendering: pixelated;
+      display: block;
+    }
+
+    /* Horizontal flip for right-side characters (Grokthar, Deepwilla)
+       so the party faces each other toward the centre */
+    .portrait[data-flip="true"] .portrait-img {
+      transform: scaleX(-1);
+    }
+
+    /* ── Character-specific speaking animations ─────────
+
+       Each animation is tuned to the character's personality.
+       Applied to .portrait-anim-wrapper so the flip on
+       .portrait-img is unaffected.
+    ─────────────────────────────────────────────────── */
+
+    /* Clauven (Wizard): barely moves — slow, measured scale.
+       The deliberateness is the point. */
+    @keyframes wizard-pulse {
+      0%, 100% { transform: scale(1) translateY(0); }
+      50%       { transform: scale(1.013) translateY(-1px); }
+    }
+    #portrait-clauven.speaking .portrait-anim-wrapper {
+      animation: wizard-pulse 2.4s ease-in-out infinite;
+    }
+
+    /* Geptima (Cleric): gentle breathing rise. Warm and steady. */
+    @keyframes cleric-breathe {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-4px); }
+    }
+    #portrait-geptima.speaking .portrait-anim-wrapper {
+      animation: cleric-breathe 1.8s ease-in-out infinite;
+    }
+
+    /* Gemaux (Bard): theatrical sway with slight rotation.
+       Transform origin at bottom — they pivot like a performer. */
+    @keyframes bard-sway {
+      0%   { transform: rotate(0deg) translateY(0); }
+      20%  { transform: rotate(-2deg) translateY(-2px); }
+      50%  { transform: rotate(2deg) translateY(-4px); }
+      80%  { transform: rotate(-1.5deg) translateY(-2px); }
+      100% { transform: rotate(0deg) translateY(0); }
+    }
+    #portrait-gemaux.speaking .portrait-anim-wrapper {
+      animation: bard-sway 1.2s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+
+    /* Grokthar (Ranger): almost nothing. A breath over 3 seconds.
+       The silence after is still doing work. */
+    @keyframes ranger-still {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.006); }
+    }
+    #portrait-grokthar.speaking .portrait-anim-wrapper {
+      animation: ranger-still 3.0s ease-in-out infinite;
+    }
+
+    /* Deepwilla (Artificer): fast, snappy, slightly asymmetric bounce.
+       0.7s cycle — she does not sit still. */
+    @keyframes artificer-bounce {
+      0%   { transform: translateY(0) scale(1); }
+      25%  { transform: translateY(-7px) scale(1.025); }
+      50%  { transform: translateY(-2px) scale(1.01); }
+      75%  { transform: translateY(-5px) scale(1.018); }
+      100% { transform: translateY(0) scale(1); }
+    }
+    #portrait-deepwilla.speaking .portrait-anim-wrapper {
+      animation: artificer-bounce 0.7s ease-in-out infinite;
+    }
+
+    /* ── Speaking wave bars ────────────────────────────── */
+
+    .speaking-bars {
+      position: absolute;
+      bottom: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 3px;
+      align-items: flex-end;
+      height: 12px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 4;
+    }
+    .portrait.speaking .speaking-bars { opacity: 1; }
+
+    .speaking-bars span {
+      width: 3px;
+      background: #CC5500;
+      border-radius: 1px;
+      animation: bar-bounce 0.5s ease-in-out infinite;
+    }
+    .speaking-bars span:nth-child(1) { height: 4px;  animation-delay: 0.00s; }
+    .speaking-bars span:nth-child(2) { height: 8px;  animation-delay: 0.10s; }
+    .speaking-bars span:nth-child(3) { height: 12px; animation-delay: 0.20s; }
+    .speaking-bars span:nth-child(4) { height: 8px;  animation-delay: 0.10s; }
+    .speaking-bars span:nth-child(5) { height: 4px;  animation-delay: 0.00s; }
+
+    @keyframes bar-bounce {
+      0%, 100% { transform: scaleY(0.5); }
+      50%       { transform: scaleY(1.0); }
+    }
+
+    /* ── Name and class labels ─────────────────────────── */
+
+    .portrait-name {
+      font-size: 7px;
+      color: #555;
+      text-align: center;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: color 0.2s ease;
+      white-space: nowrap;
+    }
+    .portrait.speaking .portrait-name { color: #CC5500; }
+
+    .portrait-class {
+      font-size: 5px;
+      color: #383838;
+      text-align: center;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* ── Connection status ─────────────────────────────── */
+
+    #status {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 6px;
+      color: #2a2a2a;
+      letter-spacing: 1px;
+    }
+    #status.connected    { color: #2d5a27; }
+    #status.disconnected { color: #5a2727; }
+
+  </style>
+</head>
+<body>
+
+  <div id="status">⬤ CONNECTING</div>
+
+  <div id="party-bar">
+
+    <!-- Clauven — High Elf Wizard — faces naturally right/forward, no flip -->
+    <div class="portrait" id="portrait-clauven" data-character="clauven" data-flip="false">
+      <div class="portrait-frame">
+        <div class="portrait-anim-wrapper">
+          <img class="portrait-img" src="./Clauven.png" alt="Clauven" />
+        </div>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Clauven</div>
+      <div class="portrait-class">Wizard</div>
+    </div>
+
+    <!-- Geptima — Human Cleric — faces forward, no flip -->
+    <div class="portrait" id="portrait-geptima" data-character="geptima" data-flip="false">
+      <div class="portrait-frame">
+        <div class="portrait-anim-wrapper">
+          <img class="portrait-img" src="./Geptima.png" alt="Geptima" />
+        </div>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Geptima</div>
+      <div class="portrait-class">Cleric</div>
+    </div>
+
+    <!-- Gemaux — Changeling Bard — centre, no flip -->
+    <div class="portrait" id="portrait-gemaux" data-character="gemaux" data-flip="false">
+      <div class="portrait-frame">
+        <div class="portrait-anim-wrapper">
+          <img class="portrait-img" src="./Gemaux.png" alt="Gemaux" />
+        </div>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Gemaux</div>
+      <div class="portrait-class">Bard</div>
+    </div>
+
+    <!-- Grokthar — Half-Orc Ranger — right side, flipped to face left toward centre -->
+    <div class="portrait" id="portrait-grokthar" data-character="grokthar" data-flip="true">
+      <div class="portrait-frame">
+        <div class="portrait-anim-wrapper">
+          <img class="portrait-img" src="./Grokthar.png" alt="Grokthar" />
+        </div>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Grokthar</div>
+      <div class="portrait-class">Ranger</div>
+    </div>
+
+    <!-- Deepwilla — Rock Gnome Artificer — far right, flipped to face left toward centre -->
+    <div class="portrait" id="portrait-deepwilla" data-character="deepwilla" data-flip="true">
+      <div class="portrait-frame">
+        <div class="portrait-anim-wrapper">
+          <img class="portrait-img" src="./Deepwilla.png" alt="Deepwilla" />
+        </div>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Deepwilla</div>
+      <div class="portrait-class">Artificer</div>
+    </div>
+
+  </div>
+
+  <div id="speech-panel">
+    <div id="speech-name"></div>
+    <div id="speech-text"></div>
+  </div>
+
+  <script>
+    const WS_URL = 'ws://localhost:8766';
+    const RECONNECT_BASE_MS = 1000;
+    const RECONNECT_MAX_MS = 30000;
+
+    const statusEl = document.getElementById('status');
+    const speechPanel = document.getElementById('speech-panel');
+    const speechName = document.getElementById('speech-name');
+    const speechText = document.getElementById('speech-text');
+    let reconnectDelay = RECONNECT_BASE_MS;
+    let ws = null;
+    let currentSpeaker = null;
+    let typewriterInterval = null;
+
+    function getPortrait(character) {
+      return document.getElementById(`portrait-${character}`);
+    }
+
+    function setSpeaking(character) {
+      if (currentSpeaker) {
+        const prev = getPortrait(currentSpeaker);
+        if (prev) prev.classList.remove('speaking');
+      }
+      if (character) {
+        const el = getPortrait(character);
+        if (el) el.classList.add('speaking');
+      }
+      currentSpeaker = character;
+    }
+
+    function setIdle() {
+      document.querySelectorAll('.portrait').forEach(p => {
+        p.classList.remove('speaking');
+      });
+      currentSpeaker = null;
+    }
+
+    function showSpeechPanel(character, text, displayName, type) {
+      speechName.textContent = displayName || character;
+      speechText.textContent = '';
+      
+      if (type === 'companion') {
+        speechPanel.className = 'companion visible';
+      } else {
+        speechPanel.className = 'visible';
+      }
+      
+      clearInterval(typewriterInterval);
+      let idx = 0;
+      
+      // JRPG Typing Effect
+      typewriterInterval = setInterval(() => {
+        if (idx < text.length) {
+          speechText.textContent += text.charAt(idx);
+          // Auto-scroll to the bottom as new lines type out
+          speechText.scrollTop = speechText.scrollHeight;
+          idx++;
+        } else {
+          clearInterval(typewriterInterval);
+        }
+      }, 35); // 35ms per character is standard snappy JRPG text speed
+    }
+
+    function hideSpeechPanel() {
+      speechPanel.className = '';
+      clearInterval(typewriterInterval);
+    }
+
+    function handleMessage(data) {
+      const { event, character, text, display_name, type } = data;
+      if (event === 'speaking_start') {
+        setSpeaking(character);
+        if (text) {
+          showSpeechPanel(character, text, display_name, type);
+        }
+      } else if (event === 'speaking_end' || event === 'idle') {
+        setIdle();
+        hideSpeechPanel();
+      }
+    }
+
+    function connect() {
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        statusEl.textContent = '⬤ LIVE';
+        statusEl.className = 'connected';
+        reconnectDelay = RECONNECT_BASE_MS;
+        setIdle();
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          handleMessage(data);
+        } catch (err) {
+          console.error('Overlay: failed to parse message', err);
+        }
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = '⬤ OFFLINE';
+        statusEl.className = 'disconnected';
+        setIdle();
+        setTimeout(() => {
+          reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+          connect();
+        }, reconnectDelay);
+      };
+
+      ws.onerror = () => { ws.close(); };
+    }
+
+    connect();
+  </script>
+
+</body>
+</html>

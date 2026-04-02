@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>The Party — Overlay</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'Press Start 2P', monospace;
+    }
+
+    /* ── Party Bar ─────────────────────────────────────── */
+
+    #party-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 180px;
+      background: linear-gradient(
+        to top,
+        rgba(10, 8, 6, 0.95) 0%,
+        rgba(10, 8, 6, 0.80) 70%,
+        transparent 100%
+      );
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 24px;
+      padding: 0 60px 16px;
+    }
+
+    /* ── Portrait Card ─────────────────────────────────── */
+
+    .portrait {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      width: 140px;
+      opacity: 0.45;
+      transition: opacity 0.2s ease;
+      position: relative;
+    }
+
+    .portrait.speaking {
+      opacity: 1.0;
+    }
+
+    /* Portrait frame */
+    .portrait-frame {
+      width: 100px;
+      height: 100px;
+      border: 3px solid #2a2a2a;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      image-rendering: pixelated;
+    }
+
+    .portrait.speaking .portrait-frame {
+      border-color: #CC5500;
+      box-shadow:
+        0 0 8px #CC5500,
+        0 0 20px rgba(204, 85, 0, 0.4),
+        inset 0 0 8px rgba(204, 85, 0, 0.1);
+    }
+
+    /* Corner pixels — D&D pixel art frame detail */
+    .portrait-frame::before,
+    .portrait-frame::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: #CC5500;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    .portrait-frame::before {
+      top: -1px;
+      left: -1px;
+    }
+    .portrait-frame::after {
+      bottom: -1px;
+      right: -1px;
+    }
+    .portrait.speaking .portrait-frame::before,
+    .portrait.speaking .portrait-frame::after {
+      opacity: 1;
+    }
+
+    /* Character icon */
+    .portrait-icon {
+      font-size: 28px;
+      line-height: 1;
+      transition: transform 0.1s ease;
+    }
+
+    /* Bounce animation when speaking */
+    @keyframes speaking-bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    .portrait.speaking .portrait-icon {
+      animation: speaking-bounce 0.6s ease-in-out infinite;
+    }
+
+    /* Speaking wave bars — audio visualiser effect */
+    .speaking-bars {
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 3px;
+      align-items: flex-end;
+      height: 12px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .portrait.speaking .speaking-bars {
+      opacity: 1;
+    }
+
+    .speaking-bars span {
+      width: 3px;
+      background: #CC5500;
+      border-radius: 1px;
+      animation: bar-bounce 0.5s ease-in-out infinite;
+    }
+
+    .speaking-bars span:nth-child(1) { height: 4px; animation-delay: 0.0s; }
+    .speaking-bars span:nth-child(2) { height: 8px; animation-delay: 0.1s; }
+    .speaking-bars span:nth-child(3) { height: 12px; animation-delay: 0.2s; }
+    .speaking-bars span:nth-child(4) { height: 8px; animation-delay: 0.1s; }
+    .speaking-bars span:nth-child(5) { height: 4px; animation-delay: 0.0s; }
+
+    @keyframes bar-bounce {
+      0%, 100% { transform: scaleY(0.5); }
+      50% { transform: scaleY(1); }
+    }
+
+    /* Character name */
+    .portrait-name {
+      font-size: 7px;
+      color: #666;
+      text-align: center;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: color 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .portrait.speaking .portrait-name {
+      color: #CC5500;
+    }
+
+    /* Class label */
+    .portrait-class {
+      font-size: 5px;
+      color: #444;
+      text-align: center;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* ── Connection status ─────────────────────────────── */
+
+    #status {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      font-size: 6px;
+      color: #333;
+      letter-spacing: 1px;
+    }
+
+    #status.connected { color: #2d5a27; }
+    #status.disconnected { color: #5a2727; }
+
+  </style>
+</head>
+<body>
+
+  <div id="status">⬤ CONNECTING</div>
+
+  <div id="party-bar">
+
+    <div class="portrait" id="portrait-clauven" data-character="clauven">
+      <div class="portrait-frame" style="--accent: #7b68ee;">
+        <span class="portrait-icon" style="color: #7b68ee;">✦</span>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Clauven</div>
+      <div class="portrait-class">Wizard</div>
+    </div>
+
+    <div class="portrait" id="portrait-geptima" data-character="geptima">
+      <div class="portrait-frame" style="--accent: #deb887;">
+        <span class="portrait-icon" style="color: #deb887;">✚</span>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Geptima</div>
+      <div class="portrait-class">Cleric</div>
+    </div>
+
+    <div class="portrait" id="portrait-gemaux" data-character="gemaux">
+      <div class="portrait-frame" style="--accent: #9370db;">
+        <span class="portrait-icon" style="color: #9370db;">♪</span>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Gemaux</div>
+      <div class="portrait-class">Bard</div>
+    </div>
+
+    <div class="portrait" id="portrait-grokthar" data-character="grokthar">
+      <div class="portrait-frame" style="--accent: #556b2f;">
+        <span class="portrait-icon" style="color: #6b8a3a;">◈</span>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Grokthar</div>
+      <div class="portrait-class">Ranger</div>
+    </div>
+
+    <div class="portrait" id="portrait-deepwilla" data-character="deepwilla">
+      <div class="portrait-frame" style="--accent: #cd853f;">
+        <span class="portrait-icon" style="color: #cd853f;">⚙</span>
+        <div class="speaking-bars">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="portrait-name">Deepwilla</div>
+      <div class="portrait-class">Artificer</div>
+    </div>
+
+  </div>
+
+  <script>
+    const WS_URL = 'ws://localhost:8766';
+    const RECONNECT_BASE_MS = 1000;
+    const RECONNECT_MAX_MS = 30000;
+
+    const statusEl = document.getElementById('status');
+    let reconnectDelay = RECONNECT_BASE_MS;
+    let ws = null;
+    let currentSpeaker = null;
+
+    function getPortrait(character) {
+      return document.getElementById(`portrait-${character}`);
+    }
+
+    function setSpeaking(character) {
+      // Clear previous speaker
+      if (currentSpeaker) {
+        const prev = getPortrait(currentSpeaker);
+        if (prev) prev.classList.remove('speaking');
+      }
+      // Set new speaker
+      if (character) {
+        const el = getPortrait(character);
+        if (el) el.classList.add('speaking');
+      }
+      currentSpeaker = character;
+    }
+
+    function setIdle() {
+      document.querySelectorAll('.portrait').forEach(p => {
+        p.classList.remove('speaking');
+      });
+      currentSpeaker = null;
+    }
+
+    function handleMessage(data) {
+      const { event, character } = data;
+      if (event === 'speaking_start') {
+        setSpeaking(character);
+      } else if (event === 'speaking_end' || event === 'idle') {
+        setIdle();
+      }
+    }
+
+    function connect() {
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        statusEl.textContent = '⬤ LIVE';
+        statusEl.className = 'connected';
+        reconnectDelay = RECONNECT_BASE_MS;
+        setIdle();
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          handleMessage(data);
+        } catch (err) {
+          console.error('Overlay: failed to parse message', err);
+        }
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = '⬤ OFFLINE';
+        statusEl.className = 'disconnected';
+        setIdle();
+        // Reconnect with exponential backoff
+        setTimeout(() => {
+          reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+          connect();
+        }, reconnectDelay);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+
+    // Start connection
+    connect();
+  </script>
+
+</body>
+</html>
