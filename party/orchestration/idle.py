@@ -54,7 +54,13 @@ class IdleCoordinator:
                 log.info("idle.triggering_chatter", scene=scene, elapsed_seconds=int(elapsed))
                 trigger = Trigger(
                     type=TriggerType.IDLE,
-                    text=f"[System: The party is idling on the '{scene}' scene. Start a natural, deeply in-character conversation. Ask each other personal questions about your classes, backgrounds, or motivations. Show real emotion and personality. Acknowledge Moonie's feelings if relevant based on the Session Context or Stream Feats.]",
+                    text=(
+                        f"[System: The party is idling on the '{scene}' scene. Start a natural, deeply in-character conversation. "
+                        "Ask each other personal questions or recall past 'Stream Feats' together. "
+                        "IMPORTANT: Do not recite dates or exact log entries like a computer. Weave the history into conversation naturally "
+                        "(e.g., 'Remember when we took down that first boss?' or 'I'm still thinking about that follower goal'). "
+                        "Show real emotion and personality. Only Clauven should even consider being precise about dates/metrics.]"
+                    ),
                     priority=TriggerPriority.NORMAL,
                     cooldown_key="idle_chatter",
                     game=None
