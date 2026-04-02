@@ -1,4 +1,4 @@
-﻿"""
+"""
 Whisper STT microphone listener.
 
 Continuously transcribes microphone input using local Whisper model.
@@ -86,9 +86,15 @@ class STTListener:
     def _transcribe_and_dispatch(self, audio: np.ndarray):
         """Transcribe audio and dispatch to async handler."""
         try:
+            # Build initial prompt with character names to improve STT accuracy
+            from party.models import CHARACTERS
+            names = ", ".join(c.display_name for c in CHARACTERS.values())
+            initial_prompt = f"The characters are: {names}, Moonie, The Dungeon Arcade. Please transcribe accurately."
+
             result = self._model.transcribe(
                 audio,
                 language=settings.stt_language,
+                initial_prompt=initial_prompt,
                 fp16=False,
             )
             text = result["text"].strip()

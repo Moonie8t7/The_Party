@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from party.config import settings
 
-def load_transcript(path: str = "") -> list[dict]:
+def load_transcript(path: str = "", date_filter: str = None) -> list[dict]:
     transcript_path = Path(path or settings.transcript_path)
     if not transcript_path.exists():
         return []
@@ -13,7 +13,12 @@ def load_transcript(path: str = "") -> list[dict]:
             line = line.strip()
             if line:
                 try:
-                    entries.append(json.loads(line))
+                    entry = json.loads(line)
+                    if date_filter:
+                        # entry["received_at"] is ISO-8601: 2026-04-02T19:51:48...
+                        if not entry.get("received_at", "").startswith(date_filter):
+                            continue
+                    entries.append(entry)
                 except json.JSONDecodeError:
                     pass
     return entries

@@ -31,6 +31,7 @@ Each character is powered by a different Large Language Model, integrating Anthr
 * **Context Loading Efficiency**: Utilizes a static snapshot architecture. Historical game data and vision logs are compiled into the System Prompt instead of message loops, lowering context token consumption over long sessions.
 * **Visual Overlay**: Displays an OBS Browser Source overlay with an auto-scrolling typewriter text format, aligned statically across the character portraits.
 * **OBS Scene Awareness**: Monitors active OBS scenes (Startup, BRB, Gaming, Chat, Post Game) to adjust character conversation styles and recaps.
+* **Session Analytics Dashboard**: Real-time monitoring of triggers, latency, token usage, and costs via a dedicated dashboard on port `8766`.
 
 ## Architecture
 

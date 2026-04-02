@@ -212,12 +212,22 @@
 
   <div id="error-msg">Could not connect to Orchestrator API. Ensure the main server is running.</div>
 
-  <div class="stat-grid" id="stat-grid">
-    <!-- populated by JS -->
+  <div class="section">
+    <div class="section-title">This Session (Today)</div>
+    <div class="stat-grid" id="session-grid">
+      <!-- populated by JS -->
+    </div>
   </div>
 
   <div class="section">
-    <div class="section-title">Characters - Times Spoken</div>
+    <div class="section-title">All-Time Totals</div>
+    <div class="stat-grid" id="stat-grid">
+      <!-- populated by JS -->
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Characters - Times Spoken (All Time)</div>
     <div id="char-bars"></div>
   </div>
 
@@ -250,10 +260,17 @@
     async function loadStats() {
       document.getElementById('error-msg').style.display = 'none';
       try {
-        const res = await fetch('http://localhost:8766/api/stats');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        renderStats(data);
+        const [allRes, sessionRes] = await Promise.all([
+          fetch('http://localhost:8766/api/stats'),
+          fetch('http://localhost:8766/api/session-stats')
+        ]);
+
+        if (!allRes.ok || !sessionRes.ok) throw new Error(`HTTP Error`);
+
+        const allData = await allRes.json();
+        const sessionData = await sessionRes.json();
+
+        renderStats(allData, sessionData);
         document.getElementById('last-updated').textContent =
           'Updated: ' + new Date().toLocaleTimeString();
       } catch (e) {
@@ -261,31 +278,15 @@
       }
     }
 
-    function renderStats(data) {
-      // Stat cards
-      const grid = document.getElementById('stat-grid');
-      grid.innerHTML = '';
+    function renderStats(allData, sessionData) {
+      // 1. Session Stat cards
+      renderGrid('session-grid', sessionData, 'today');
+      
+      // 2. All-Time Stat cards
+      renderGrid('stat-grid', allData, 'all time');
 
-      const cards = [
-        { label: 'Total Triggers', value: data.total_triggers, sub: 'all time' },
-        { label: 'Avg Responses/Scene', value: data.avg_responses_per_scene, sub: 'characters per trigger' },
-        { label: 'Avg Latency', value: `${(data.avg_latency_ms / 1000).toFixed(1)}s`, sub: 'LLM generation time' },
-        { label: 'Est. Total Cost', value: `$${data.total_estimated_cost_usd}`, sub: 'all providers combined' },
-        { label: 'Tokens Used', value: (data.total_tokens_input + data.total_tokens_output).toLocaleString(), sub: `${data.total_tokens_input.toLocaleString()} in / ${data.total_tokens_output.toLocaleString()} out` },
-        { label: 'Repair Events', value: data.repair_events, sub: 'output violations fixed' },
-      ];
-
-      for (const card of cards) {
-        grid.innerHTML += `
-          <div class="stat-card">
-            <div class="stat-label">${card.label}</div>
-            <div class="stat-value">${card.value}</div>
-            <div class="stat-sub">${card.sub}</div>
-          </div>`;
-      }
-
-      // Character bars
-      const counts = data.character_speak_counts;
+      // 3. Character bars (All Time)
+      const counts = allData.character_speak_counts;
       const maxCount = Math.max(...Object.values(counts), 1);
       const order = ['clauven', 'geptima', 'gemaux', 'grokthar', 'deepwilla'];
       const charBars = document.getElementById('char-bars');
@@ -305,10 +306,10 @@
           </div>`;
       }
 
-      // Recent triggers
+      // 4. Recent triggers (Combined/latest)
       const tbody = document.getElementById('trigger-rows');
       tbody.innerHTML = '';
-      for (const t of data.recent_triggers) {
+      for (const t of allData.recent_triggers) {
         const chars = (t.characters || [])
           .map(c => `<span class="char-pill" style="border-left:2px solid ${CHARACTER_COLOURS[c]||'#CC5500'}">${c}</span>`)
           .join('');
@@ -324,6 +325,29 @@
             <td>${(t.latency_ms / 1000).toFixed(1)}s</td>
             <td>$${(t.cost || 0).toFixed(4)}</td>
           </tr>`;
+      }
+    }
+
+    function renderGrid(id, data, suffix) {
+      const grid = document.getElementById(id);
+      grid.innerHTML = '';
+
+      const cards = [
+        { label: 'Total Triggers', value: data.total_triggers, sub: suffix },
+        { label: 'Avg Responses/Scene', value: data.avg_responses_per_scene, sub: 'characters per trigger' },
+        { label: 'Avg Latency', value: `${(data.avg_latency_ms / 1000).toFixed(1)}s`, sub: 'LLM generation time' },
+        { label: 'Estimated Cost', value: `$${data.total_estimated_cost_usd.toFixed(4)}`, sub: 'all providers combined' },
+        { label: 'Tokens Used', value: (data.total_tokens_input + data.total_tokens_output).toLocaleString(), sub: `${data.total_tokens_input.toLocaleString()} in / ${data.total_tokens_output.toLocaleString()} out` },
+        { label: 'Repair Events', value: data.repair_events, sub: 'output violations fixed' },
+      ];
+
+      for (const card of cards) {
+        grid.innerHTML += `
+          <div class="stat-card">
+            <div class="stat-label">${card.label}</div>
+            <div class="stat-value">${card.value}</div>
+            <div class="stat-sub">${card.sub}</div>
+          </div>`;
       }
     }
 

@@ -264,6 +264,18 @@ _DIRECT_ADDRESS_PATTERNS = [
 
 _CHARACTER_NAMES = ["clauven", "geptima", "gemaux", "grokthar", "deepwilla"]
 
+# Phonetic aliases to handle STT variances (Whisper prompts help, but these provide safety)
+PHONETIC_ALIASES = {
+    "clauven": ["clorvin", "clovin", "clovan", "cloven", "clover"],
+    "deepwilla": ["deepwiller", "deepvilla", "deepwillow", "deep villa"],
+    "geptima": ["septima", "geptema", "geptimma"],
+    "gemaux": ["gemmo", "gem-o", "gemmo", "gemauto", "gemo"],
+    "grokthar": ["grok-thar", "grokthor", "grockthar"],
+}
+
+# Group aliases that trigger multiple characters
+GROUP_ALIASES = ["party", "everyone", "all of you", "the party", "guys"]
+
 # COMPANION_PROBABILITIES[primary] = [(companion, probability), ...]
 # Listed in priority order - first to pass speaks
 COMPANION_PROBABILITIES: dict[str, list[tuple[str, float]]] = {
@@ -304,20 +316,37 @@ COMPANION_GLOBAL_CHANCE = 0.50
 
 def detect_direct_address(text: str) -> DirectAddressResult:
     """
-    Check if the trigger text is directly addressing a specific character.
+    Check if the trigger text is directly addressing a specific character or the whole party.
     Returns DirectAddressResult with detected=False if no match.
     """
     text_lower = text.lower().strip()
 
+    # 1. Check for group address (e.g. "Hey party")
+    for group in GROUP_ALIASES:
+        if re.search(fr"\b(?:hey|ask|yo)?[\s]?{group}\b", text_lower):
+            # Special case: use a random character as primary, and everyone as candidate
+            primary = random.choice(_CHARACTER_NAMES)
+            other_chars = [c for c in _CHARACTER_NAMES if c != primary]
+            return DirectAddressResult(
+                detected=True,
+                primary=primary,
+                # For group chat, we want high probability for others to join
+                companion_candidates=[(c, 0.90) for c in other_chars],
+            )
+
+    # 2. Check for specific character address (including phonetic aliases)
     for name in _CHARACTER_NAMES:
-        for pattern_template in _DIRECT_ADDRESS_PATTERNS:
-            pattern = pattern_template.format(name=name)
-            if re.search(pattern, text_lower):
-                return DirectAddressResult(
-                    detected=True,
-                    primary=name,
-                    companion_candidates=COMPANION_PROBABILITIES[name],
-                )
+        # Check primary name and aliases
+        candidates = [name] + PHONETIC_ALIASES.get(name, [])
+        for candidate in candidates:
+            for pattern_template in _DIRECT_ADDRESS_PATTERNS:
+                pattern = pattern_template.format(name=re.escape(candidate))
+                if re.search(pattern, text_lower):
+                    return DirectAddressResult(
+                        detected=True,
+                        primary=name,
+                        companion_candidates=COMPANION_PROBABILITIES[name],
+                    )
 
     return DirectAddressResult(
         detected=False,
@@ -326,26 +355,31 @@ def detect_direct_address(text: str) -> DirectAddressResult:
     )
 
 
-def resolve_companion(result: DirectAddressResult) -> Optional[str]:
+def resolve_companions(result: DirectAddressResult) -> list[str]:
     """
-    Given a DirectAddressResult, probabilistically select one companion.
-    Returns the companion's name, or None if no companion speaks.
+    Given a DirectAddressResult, probabilistically select companions.
+    Returns a list of companion names.
 
     Two-stage:
-    1. Global gate (50%) - if fails, nobody comments
-    2. Per-character probability - first candidate to pass their roll speaks
+    1. Global gate (50%) - if fails, nobody else comments (unless group address)
+    2. Per-character probability - all candidates who pass their roll speak
     """
     if not result.detected:
-        return None
+        return []
 
-    if random.random() >= COMPANION_GLOBAL_CHANCE:
-        return None
+    # If it's a group address (determined by high probabilities in candidates),
+    # we skip the global gate or use a much higher one.
+    is_group = any(p > 0.8 for _, p in result.companion_candidates)
 
+    if not is_group and random.random() >= COMPANION_GLOBAL_CHANCE:
+        return []
+
+    companions = []
     for companion_name, probability in result.companion_candidates:
         if random.random() < probability:
-            return companion_name
+            companions.append(companion_name)
 
-    return None
+    return companions
 
 
 async def _llm_route(trigger_id: str, trigger_text: str) -> list[str]:
@@ -419,17 +453,15 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
     # ── Direct address check - runs before all other routing ──────────
     direct = detect_direct_address(trigger.text)
     if direct.detected:
-        companion = resolve_companion(direct)
-        characters = [direct.primary]
-        if companion:
-            characters.append(companion)
-        companion_set = {companion} if companion else set()
+        companions = resolve_companions(direct)
+        characters = [direct.primary] + companions
+        companion_set = set(companions)
 
         log.info(
             "router.direct_address",
             trigger_id=trigger.trigger_id,
             primary=direct.primary,
-            companion=companion,
+            companions=companions,
         )
         return characters, "direct_address", companion_set
 

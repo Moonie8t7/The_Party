@@ -35,14 +35,19 @@ class OverlayServer:
             port=settings.overlay_port,
         )
 
-    async def _handle_http_request(self, path, request_headers):
+    async def _handle_http_request(self, path: str, request_headers):
         """Handle HTTP GET requests for the analytics API."""
-        if path == "/api/stats":
+        if path == "/api/stats" or path == "/api/session-stats":
             from party.persistence.stats import load_transcript, compute_stats
+            from datetime import datetime
             import http
             
             try:
-                entries = load_transcript()
+                date_filter = None
+                if path == "/api/session-stats":
+                    date_filter = datetime.utcnow().strftime("%Y-%m-%d")
+
+                entries = load_transcript(date_filter=date_filter)
                 stats = compute_stats(entries)
                 body = json.dumps(stats).encode()
                 
@@ -56,7 +61,7 @@ class OverlayServer:
                     body
                 )
             except Exception as e:
-                log.error("overlay.api_stats_failed", reason=str(e))
+                log.error("overlay.api_stats_failed", path=path, reason=str(e))
                 return (http.HTTPStatus.INTERNAL_SERVER_ERROR, [], b"Internal Server Error")
         
         return None  # Continue with WebSocket handshake
