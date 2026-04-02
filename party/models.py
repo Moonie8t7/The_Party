@@ -1,4 +1,4 @@
-﻿from enum import Enum
+from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
 from dataclasses import dataclass, field
@@ -26,6 +26,7 @@ class TriggerType(str, Enum):
     TIMED = "timed"
     STT = "stt"
     SYSTEM = "system"
+    IDLE = "idle"
 
 
 class TriggerPriority(int, Enum):

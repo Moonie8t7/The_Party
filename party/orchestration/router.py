@@ -1,9 +1,9 @@
-﻿import json
+import json
 import random
 import re
 from anthropic import Anthropic
 from party.config import settings
-from party.models import Trigger, CHARACTERS, DirectAddressResult
+from party.models import Trigger, CHARACTERS, DirectAddressResult, TriggerType
 from party.log import get_logger
 
 log = get_logger(__name__)
@@ -405,8 +405,17 @@ async def route_trigger(trigger: Trigger) -> list[str]:
 async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]]:
     """
     Internal router. Returns (characters, method, companion_set) where method is
-    "rule" | "llm" | "default" | "direct_address". Used by chain.py.
+    "rule" | "llm" | "default" | "direct_address" | "idle". Used by chain.py.
     """
+    if trigger.type == TriggerType.IDLE:
+        # Pick 2-3 random characters for idle chatter
+        all_chars = list(CHARACTERS.keys())
+        random.shuffle(all_chars)
+        count = random.randint(2, 3)
+        characters = all_chars[:count]
+        log.info("router.idle_select", trigger_id=trigger.trigger_id, characters=characters)
+        return characters, "idle", set()
+
     # ── Direct address check - runs before all other routing ──────────
     direct = detect_direct_address(trigger.text)
     if direct.detected:

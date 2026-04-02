@@ -27,9 +27,15 @@ class Scheduler:
         # text_hash -> last_accepted datetime
         self._seen: dict[str, datetime] = {}
 
+        # Track last activity for IdleCoordinator
+        self.last_activity_time = datetime.utcnow()
+
         # Auto-start consumer if handler provided at construction time
         if handler is not None:
             asyncio.get_event_loop().create_task(self.run_consumer())
+
+    def get_last_activity_time(self) -> datetime:
+        return self.last_activity_time
 
     def set_handler(self, fn: Callable[[Trigger], Awaitable]) -> None:
         self._handler = fn
@@ -86,6 +92,7 @@ class Scheduler:
 
             self._cooldowns[ck] = now
             self._seen[th] = now
+            self.last_activity_time = now
 
             log.info(
                 "trigger.queued",

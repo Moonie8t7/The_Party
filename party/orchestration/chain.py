@@ -30,6 +30,7 @@ async def _build_context_preamble() -> str:
 
     now = datetime.now()
     parts.append(f"Current date and time: {now.strftime('%A %d %B %Y, %H:%M')}")
+    parts.append("You are currently in a live stream on Twitch. The streamer/user you are talking to is Moonie.")
 
     session = read_session_context()
     if session:
@@ -104,7 +105,11 @@ async def run_chain(
     """
     results = []
     session_snapshot = await _build_context_preamble()
-    context_messages = [{"role": "user", "content": f"The situation: {trigger.text}"}]
+    
+    if trigger.type == TriggerType.IDLE:
+        context_messages = [{"role": "user", "content": "Start an idle conversation based on the current scene and context."}]
+    else:
+        context_messages = [{"role": "user", "content": f"Moonie said: {trigger.text}"}]
 
     for i, name in enumerate(character_names):
         character = CHARACTERS[name]
@@ -172,11 +177,11 @@ async def run_chain(
             and next_name in companion_characters
         )
         summary_lines = [
-            f"The situation: {trigger.text}",
+            f"Moonie said: {trigger.text}" if trigger.type != TriggerType.IDLE else "Current Situation: Idle chatter",
             "",
         ]
         for r in results:
-            summary_lines.append(f"{r.display_name} just said: {r.text}")
+            summary_lines.append(f"{r.display_name} said: {r.text}")
         if results:
             summary_lines.append("")
 

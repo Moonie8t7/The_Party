@@ -1,4 +1,4 @@
-﻿"""
+"""
 Entry point for The Party orchestrator.
 Run with: python -m party.main
 """
@@ -113,7 +113,12 @@ async def main():
     consumer_task = asyncio.create_task(scheduler.run_consumer())
     log.info("startup.consumer_started")
 
-    # 6b. Start STT coordinator
+    # 6b. Start Idle Coordinator
+    from party.orchestration.idle import IdleCoordinator
+    idle_coordinator = IdleCoordinator(scheduler)
+    await idle_coordinator.start()
+
+    # 6c. Start STT coordinator
     stt_coordinator = STTCoordinator(enqueue_fn=scheduler.enqueue)
     if settings.stt_enabled:
         await stt_coordinator.start()
@@ -156,6 +161,7 @@ async def main():
             pass
 
         await stt_coordinator.stop()
+        await idle_coordinator.stop()
         await stop_vision_loop()
         await overlay_server.stop()
         log.info("shutdown.complete")
