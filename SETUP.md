@@ -1,145 +1,77 @@
-﻿# The Dungeon Arcade - Party Orchestrator Setup
+# 🗡️ The Party - Setup Guide
 
-## Folder Structure
+## 1. Environment Requirements
+- **Python**: 3.10 or higher
+- **OBS Studio**: With WebSockets enabled (standard in v28+)
+- **ElevenLabs**: An active API Key for high-quality TTS
 
-```
-dungeon_arcade/
-├── orchestrator.py              # Main orchestrator
-├── requirements.txt             # Python dependencies
-├── streamerbot_trigger_sender.cs  # Streamer.bot action
-├── prompts/
-│   ├── clauven.txt
-│   ├── geptima.txt
-│   ├── gemaux.txt
-│   ├── grokthar.txt
-│   └── deepwilla.txt
-```
-
-## Step 1 - Create the prompts folder
-
-Create a `prompts/` folder next to `orchestrator.py`.
-Save each character's system prompt as a `.txt` file with the filename matching the character name exactly.
-
-## Step 2 - Install dependencies
+## 2. Installation
 
 ```bash
+git clone https://github.com/Moonie8t7/The_Party.git
+cd The_Party
 pip install -r requirements.txt
 ```
 
-## Step 3 - Add your API keys
+## 3. Configuration
 
-Open `orchestrator.py` and fill in the `CONFIG` block at the top:
+### .env Setup
+Copy `.env.example` to `.env` and configure your credentials:
 
-```python
-CONFIG = {
-    "anthropic_api_key":  "sk-ant-...",
-    "openai_api_key":     "sk-...",
-    "gemini_api_key":     "AIza...",
-    "grok_api_key":       "xai-...",
-    "deepseek_api_key":   "sk-...",
-    ...
-}
+```ini
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=...
+GROK_API_KEY=...
+DEEPSEEK_API_KEY=...
+ELEVENLABS_API_KEY=...
+
+# OBS WebSocket (Tools -> WebSocket Server Settings)
+VISION_OBS_HOST=localhost
+VISION_OBS_PORT=4455
+VISION_OBS_PASSWORD=your_password
 ```
 
-## Step 4 - Run the orchestrator
+### Character Voices
+Find your preferred Voice IDs in the ElevenLabs Library and add them to your `.env`:
+- `VOICE_CLAUVEN`
+- `VOICE_GEPTIMA`
+- `VOICE_GEMAUX`
+- `VOICE_GROKHTAR`
+- `VOICE_DEEPWILLA`
+
+## 4. OBS Integration
+
+### The Visual Overlay
+1. Add a new **Browser Source** in OBS.
+2. Set the URL to the local path of `overlay/overlay.html`.
+3. Set Dimensions to **1920 x 1080**.
+4. Enable "Shutdown source when not visible" and "Refresh browser when scene becomes active".
+
+### Scene Awareness
+The orchestrator automatically detects your active scene name. To ensure the party reacts correctly, name your OBS scenes as follows (or similar):
+- `Startup` (Starting Soon)
+- `Gaming` (Active Play)
+- `BRB` (Break)
+- `Chat` (Just Chatting)
+- `Post Game` (Stream Ending)
+
+## 5. Launching the System
 
 ```bash
-python orchestrator.py
+python -m party.main
 ```
 
-You should see:
-```
-[Server] Starting Dungeon Arcade Orchestrator...
-[Server] Listening on ws://localhost:8765
-```
+You should see the system initialize, populate the Twitch context, and start listening on:
+- **ws://localhost:8765**: Orchestrator (Connected to Streamer.bot)
+- **ws://localhost:8766**: Overlay (Connected to OBS Browser Source)
 
-Keep this running in the background while streaming.
+## 6. Streamer.bot Wiring
 
-## Step 5 - Set up Streamer.bot
+1. Create an Action in Streamer.bot.
+2. Add an **Execute C# Code** sub-action.
+3. Paste the contents of `streamerbot_trigger_sender.cs` from the root directory.
+4. Set the `triggerText` in the code or via global variables to initiate a reaction.
 
-1. In Streamer.bot, create a new Action
-2. Add an "Execute C# Code" sub-action
-3. Paste the contents of `streamerbot_trigger_sender.cs`
-4. Attach this action to any trigger:
-   - Chat command (e.g. `!party`)
-   - Hotkey
-   - Channel point redemption
-   - Timer
-
-### Sending custom game event text
-
-For hotkeys tied to game events, set `triggerText` manually in the C# action:
-
-```csharp
-string triggerText = "DM Moonie just died to a zombie horde in 7 Days to Die.";
-```
-
-### Passing chat message content
-
-For chat-based triggers, `rawInput` will automatically capture the message:
-
-```csharp
-string triggerText = args["rawInput"].ToString();
-```
-
-## Step 6 - Test without Streamer.bot
-
-You can test the orchestrator directly by sending a WebSocket message.
-Use a tool like `wscat`:
-
-```bash
-npm install -g wscat
-wscat -c ws://localhost:8765
-> {"type": "hotkey", "text": "DM Moonie just died to a zombie horde."}
-```
-
-## Trigger Types
-
-| Type | Source | When to use |
-|------|--------|-------------|
-| `hotkey` | Streamer.bot hotkey | Manual game moments |
-| `chat_trigger` | Chat command or keyword | Viewer interactions |
-| `timed` | Streamer.bot timer | Regular commentary intervals |
-| `stt` | Whisper STT output | Reacting to what you say on mic |
-
-## Routing Rules
-
-The orchestrator uses keyword matching first, then falls back to a fast LLM call.
-To add new rules, edit the `ROUTING_RULES` list in `orchestrator.py`:
-
-```python
-{
-    "keywords": ["your", "keywords", "here"],
-    "characters": ["character1", "character2"],
-},
-```
-
-## Adding ElevenLabs TTS
-
-When ready, replace the `speak()` function in `orchestrator.py`:
-
-```python
-async def speak(display_name: str, text: str, voice_id: str):
-    from elevenlabs.client import ElevenLabs
-    client = ElevenLabs(api_key="YOUR_ELEVENLABS_KEY")
-    audio = client.text_to_speech.convert(
-        voice_id=voice_id,
-        text=text,
-        model_id="eleven_turbo_v2",
-    )
-    # Play audio - use pygame or sounddevice
-    play(audio)
-```
-
-## OBS Overlay
-
-The orchestrator sends WebSocket messages to the OBS browser source overlay:
-
-```json
-{"event": "speaking_start", "character": "grokthar"}
-{"event": "speaking_end",   "character": "grokthar"}
-{"event": "idle",           "character": null}
-```
-
-The overlay listens for these and animates the correct character sprite.
-Overlay build is a separate step.
+---
+*For development details, see [README.md](README.md).*

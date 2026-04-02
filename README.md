@@ -30,6 +30,7 @@ Each character is powered by a different Large Language Model, integrating Anthr
 * **Concurrent TTS Pipelining**: ElevenLabs voice generation occurs in background worker threads. The system synthesises the audio of the following response while the current audio is playing, minimizing inter-response latency.
 * **Context Loading Efficiency**: Utilizes a static snapshot architecture. Historical game data and vision logs are compiled into the System Prompt instead of message loops, lowering context token consumption over long sessions.
 * **Visual Overlay**: Displays an OBS Browser Source overlay with an auto-scrolling typewriter text format, aligned statically across the character portraits.
+* **OBS Scene Awareness**: Monitors active OBS scenes (Startup, BRB, Gaming, Chat, Post Game) to adjust character conversation styles and recaps.
 
 ## Architecture
 
@@ -40,6 +41,7 @@ graph TD
     subgraph Intake Layer
         SB[Streamer.bot] --> WS(WebSocket Server)
         Mic[Streamer Mic] --> STT(Whisper STT)
+        Scene(OBS Scene Monitor) -- Context --> Chain
     end
 
     subgraph Core Orchestration
