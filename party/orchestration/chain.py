@@ -365,6 +365,8 @@ async def orchestrate(trigger: Trigger) -> AsyncGenerator[Any, None]:
     start = time.monotonic()
 
     result: RouterResult = await route_trigger(trigger)
+    if result.method == "ignored_redundant":
+        return
     _enforce_speaker_limits(trigger, result)
 
     all_characters = result.primary + result.companions

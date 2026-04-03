@@ -61,12 +61,18 @@ async def play(audio_bytes: bytes | None, text: str, character_name: str) -> Non
     
     log.info("tts.timing", character=character_name, playback_ms=int((t_complete - t_start) * 1000))
     log.info("tts.elevenlabs_complete", character=character_name)
+_elevenlabs_client = None
+
+
 def _generate_audio(text: str, voice_id: str, vs: CharacterVoiceSettings) -> bytes:
     """Synchronous ElevenLabs audio generation. Run in thread pool."""
+    global _elevenlabs_client
     from elevenlabs.client import ElevenLabs
     from elevenlabs import VoiceSettings
 
-    client = ElevenLabs(api_key=settings.elevenlabs_api_key)
+    if _elevenlabs_client is None:
+        _elevenlabs_client = ElevenLabs(api_key=settings.elevenlabs_api_key)
+    client = _elevenlabs_client
 
     audio_generator = client.text_to_speech.convert(
         voice_id=voice_id,

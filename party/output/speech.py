@@ -1,5 +1,5 @@
 import asyncio
-from party.models import Scene, CHARACTERS
+from party.models import Scene, CHARACTERS, CharacterResponse
 from party.output import tts
 from party.output.obs import notify as obs_notify
 from party.config import settings
