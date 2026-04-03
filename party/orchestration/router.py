@@ -1,10 +1,13 @@
 import json
 import random
 import re
-from anthropic import Anthropic
+from dataclasses import dataclass, field
+from typing import Optional
+from anthropic import AsyncAnthropic
 from party.config import settings
 from party.models import Trigger, CHARACTERS, DirectAddressResult, TriggerType
 from party.log import get_logger
+from party.orchestration.modes import ExecutionMode
 from party.context.phonetics import (
     CHARACTER_NAMES,
     PHONETIC_ALIASES,
@@ -13,6 +16,75 @@ from party.context.phonetics import (
 )
 
 log = get_logger(__name__)
+
+
+# ── RouterResult — Sprint 11 breaking change ──────────────────────────────────
+
+@dataclass
+class RouterResult:
+    """
+    Structured routing decision returned by route_trigger().
+
+    Invariants:
+    - len(primary) == 1 always
+    - len(companions) <= 1 for non-SYSTEM triggers; up to 4 for SYSTEM
+    - primary[0] not in companions
+    """
+    primary: list[str]       # always exactly 1 character name
+    companions: list[str]    # 0–1 for normal triggers; up to 4 for SYSTEM
+    method: str              # "rule" | "llm" | "default" | "direct_address" | "idle" | "system"
+    mode: ExecutionMode      # PARALLEL or SEQUENTIAL
+
+
+# ── ExecutionMode assignment per trigger type (Task 11.6) ─────────────────────
+
+_MODE_MAP: dict[TriggerType, ExecutionMode] = {
+    TriggerType.SYSTEM:       ExecutionMode.PARALLEL,
+    TriggerType.HOTKEY:       ExecutionMode.PARALLEL,
+    TriggerType.CHAT_TRIGGER: ExecutionMode.SEQUENTIAL,
+    TriggerType.STT:          ExecutionMode.SEQUENTIAL,
+    TriggerType.IDLE:         ExecutionMode.PARALLEL,
+    TriggerType.TIMED:        ExecutionMode.SEQUENTIAL,
+}
+
+
+# ── Round-robin index for IDLE primary selection ──────────────────────────────
+
+_idle_index = 0
+
+
+def _get_mode(trigger_type: TriggerType) -> ExecutionMode:
+    return _MODE_MAP.get(trigger_type, ExecutionMode.SEQUENTIAL)
+
+
+def _select_companion(primary: str, trigger_type: TriggerType) -> Optional[str]:
+    """
+    Probabilistically select one companion for non-direct-address routing.
+    STT triggers never get a companion.
+    IDLE triggers always get one (banter is the point).
+    """
+    if trigger_type == TriggerType.STT:
+        return None
+
+    candidates = COMPANION_PROBABILITIES[primary]
+
+    if trigger_type == TriggerType.IDLE:
+        # Always assign a companion for IDLE
+        for companion_name, probability in candidates:
+            if random.random() < probability:
+                return companion_name
+        return candidates[0][0] if candidates else None
+
+    # Standard global chance gate
+    if random.random() >= COMPANION_GLOBAL_CHANCE:
+        return None
+
+    for companion_name, probability in candidates:
+        if random.random() < probability:
+            return companion_name
+
+    return None
+
 
 ROUTING_RULES = [
 
@@ -354,10 +426,9 @@ def resolve_companions(result: DirectAddressResult, scene: str = "Unknown") -> l
 
 
 async def _llm_route(trigger_id: str, trigger_text: str) -> list[str]:
-    """LLM fallback routing."""
+    """LLM fallback routing. Returns list of character names (primary first)."""
     import asyncio
-    loop = asyncio.get_event_loop()
-    client = Anthropic(api_key=settings.anthropic_api_key)
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
     router_prompt = f"""You are routing a message to the correct party members in a D&D-themed Twitch stream.
 
@@ -375,15 +446,12 @@ The first character should be most relevant to the trigger.
 Example: ["grokthar", "clauven"]"""
 
     response = await asyncio.wait_for(
-        loop.run_in_executor(
-            None,
-            lambda: client.messages.create(
-                model=settings.router_model,
-                max_tokens=100,
-                messages=[{"role": "user", "content": router_prompt}],
-            ),
+        client.messages.create(
+            model=settings.router_model,
+            max_tokens=100,
+            messages=[{"role": "user", "content": router_prompt}],
         ),
-        timeout=settings.provider_timeout_seconds,
+        timeout=settings.provider_timeout_normal_seconds,
     )
 
     raw = response.content[0].text.strip()
@@ -397,38 +465,60 @@ Example: ["grokthar", "clauven"]"""
     raise ValueError("LLM returned no valid character names")
 
 
-async def route_trigger(trigger: Trigger) -> list[str]:
-    """Public router interface."""
-    characters, _, _ = await _route_with_method(trigger)
-    return characters
+async def route_trigger(trigger: Trigger) -> RouterResult:
+    """
+    Public router interface. Returns RouterResult.
+    This is the Sprint 11 breaking change — previously returned list[str].
+    """
+    return await _route_with_method(trigger)
 
 
-async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]]:
-    """Internal router logic."""
-    # ── Redundancy check ──────────
+async def _route_with_method(trigger: Trigger) -> RouterResult:
+    """Internal router logic. Returns RouterResult."""
+    mode = _get_mode(trigger.type)
+
+    # ── Redundancy check ──────────────────────────────────────────────────────
     if trigger.type == TriggerType.TIMED and "observe and comment" in trigger.text:
         log.info("router.ignore_redundant_timed", trigger_id=trigger.trigger_id)
-        return [], "ignored_redundant", set()
+        return RouterResult(primary=["grokthar"], companions=[], method="ignored_redundant", mode=mode)
 
-    if trigger.type == TriggerType.IDLE:
+    # ── SYSTEM: all characters, primary from routing ──────────────────────────
+    if trigger.type == TriggerType.SYSTEM:
         all_chars = list(CHARACTERS.keys())
-        random.shuffle(all_chars)
-        count = random.randint(2, 3)
-        characters = all_chars[:count]
-        log.info("router.idle_select", trigger_id=trigger.trigger_id, characters=characters)
-        return characters, "idle", set()
+        # Use keyword routing to pick primary; rest are companions
+        text_lower = trigger.text.lower()
+        primary = "gemaux"  # default primary for SYSTEM
+        for rule in ROUTING_RULES:
+            if any(kw in text_lower for kw in rule["keywords"]):
+                primary = rule["characters"][0]
+                break
+        companions = [c for c in all_chars if c != primary]
+        log.info("router.system_all", trigger_id=trigger.trigger_id, primary=primary)
+        return RouterResult(primary=[primary], companions=companions, method="system", mode=mode)
 
-    # ── Direct address check ──────────
+    # ── IDLE: round-robin primary, always one companion ───────────────────────
+    if trigger.type == TriggerType.IDLE:
+        global _idle_index
+        all_chars = list(CHARACTERS.keys())
+        primary = all_chars[_idle_index % len(all_chars)]
+        _idle_index += 1
+        companion = _select_companion(primary, trigger.type)
+        companions = [companion] if companion else []
+        log.info("router.idle_select", trigger_id=trigger.trigger_id, primary=primary, companions=companions)
+        return RouterResult(primary=[primary], companions=companions, method="idle", mode=mode)
+
+    # ── Direct address check ──────────────────────────────────────────────────
     direct = detect_direct_address(trigger.text)
     if direct.detected:
         try:
+            from party.context.obs_context import get_current_scene
             scene = await get_current_scene()
-        except:
+        except Exception:
             scene = "Unknown"
-            
-        companions = resolve_companions(direct, scene=scene)
-        characters = [direct.primary] + companions
-        companion_set = set(companions)
+
+        all_companions = resolve_companions(direct, scene=scene)
+        # Cap to 1 companion for non-SYSTEM triggers
+        companions = all_companions[:1]
 
         log.info(
             "router.direct_address",
@@ -436,35 +526,36 @@ async def _route_with_method(trigger: Trigger) -> tuple[list[str], str, set[str]
             primary=direct.primary,
             companions=companions,
         )
-        return characters, "direct_address", companion_set
+        return RouterResult(primary=[direct.primary], companions=companions, method="direct_address", mode=mode)
 
-    # ── Rule-based routing ──────────
+    # ── Rule-based routing ────────────────────────────────────────────────────
     text_lower = trigger.text.lower()
     for idx, rule in enumerate(ROUTING_RULES):
         if any(kw in text_lower for kw in rule["keywords"]):
-            characters = rule["characters"]
+            primary = rule["characters"][0]
+            companion = _select_companion(primary, trigger.type)
+            companions = [companion] if companion else []
             log.info(
                 "router.rule_match",
                 trigger_id=trigger.trigger_id,
-                characters=characters,
+                primary=primary,
+                companions=companions,
                 rule_index=idx,
             )
-            return characters, "rule", set()
+            return RouterResult(primary=[primary], companions=companions, method=f"rule:{idx}", mode=mode)
 
-    # ── LLM fallback ──────────
+    # ── LLM fallback ──────────────────────────────────────────────────────────
     log.info("router.llm_fallback_attempt", trigger_id=trigger.trigger_id)
     try:
-        characters = await _llm_route(trigger.trigger_id, trigger.text)
-        log.info(
-            "router.llm_fallback", trigger_id=trigger.trigger_id, characters=characters
-        )
-        return characters, "llm", set()
+        chars = await _llm_route(trigger.trigger_id, trigger.text)
+        primary = chars[0]
+        companion = _select_companion(primary, trigger.type)
+        companions = [companion] if companion else []
+        log.info("router.llm_fallback", trigger_id=trigger.trigger_id, primary=primary)
+        return RouterResult(primary=[primary], companions=companions, method="llm", mode=mode)
     except Exception as e:
-        log.warning(
-            "router.llm_fallback_failed", trigger_id=trigger.trigger_id, reason=str(e)
-        )
+        log.warning("router.llm_fallback_failed", trigger_id=trigger.trigger_id, reason=str(e))
 
-    # Final fallback
-    default = ["grokthar", "gemaux"]
+    # ── Final fallback ────────────────────────────────────────────────────────
     log.info("router.default", trigger_id=trigger.trigger_id, reason="no_rule_no_llm")
-    return default, "default", set()
+    return RouterResult(primary=["grokthar"], companions=["gemaux"], method="default", mode=mode)

@@ -2,7 +2,6 @@ import asyncio
 import time
 from abc import ABC, abstractmethod
 from party.models import Character, CharacterResponse
-from party.config import settings
 
 
 class ProviderError(Exception):
@@ -20,6 +19,8 @@ class BaseProvider(ABC):
         character: Character,
         system_prompt: str,
         messages: list[dict],
+        timeout: float = 10.0,
+        max_retries: int = 1,
     ) -> CharacterResponse:
         ...
 
@@ -30,20 +31,22 @@ class BaseProvider(ABC):
             return system_prompt + "\n\n" + character.context_supplement
         return system_prompt
 
-    async def _with_timeout_and_retry(self, coro_fn, *args):
-        """Retry wrapper with exponential backoff."""
+    async def _with_timeout_and_retry(self, coro_fn, *args, timeout: float = 10.0, max_retries: int = 1):
+        """
+        Retry wrapper with exponential backoff.
+        timeout: seconds per attempt
+        max_retries: number of additional attempts after the first (0 = one shot, no retry)
+        Retries on TimeoutError and transient exceptions only.
+        """
         last_error = None
-        for attempt in range(settings.provider_max_retries + 1):
+        for attempt in range(max_retries + 1):
             try:
-                return await asyncio.wait_for(
-                    coro_fn(*args),
-                    timeout=settings.provider_timeout_seconds,
-                )
+                return await asyncio.wait_for(coro_fn(*args), timeout=timeout)
             except asyncio.TimeoutError:
                 last_error = "timeout"
             except Exception as e:
                 last_error = str(e)
-            if attempt < settings.provider_max_retries:
+            if attempt < max_retries:
                 await asyncio.sleep(0.5 * (2 ** attempt))
         raise ProviderError(
             self.__class__.__name__,

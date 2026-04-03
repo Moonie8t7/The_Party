@@ -1,9 +1,8 @@
 import re
 import time
-import os
 import asyncio
-from datetime import datetime
 from typing import Optional, AsyncGenerator, Any
+
 from party.models import Trigger, Scene, Character, CharacterResponse, CHARACTERS, TriggerType
 from party.providers.base import ProviderError
 from party.providers.anthropic import AnthropicProvider
@@ -11,240 +10,391 @@ from party.providers.openai import OpenAIProvider
 from party.providers.gemini import GeminiProvider
 from party.providers.grok import GrokProvider
 from party.providers.deepseek import DeepSeekProvider
-from party.orchestration.router import _route_with_method
+from party.orchestration.router import route_trigger, RouterResult
+from party.orchestration.modes import ExecutionMode
 from party.orchestration.repair import repair_response, SENTENCE_LIMITS
-from party.context.session import read_session_context
-from party.context.obs_context import get_current_scene
-from party.vision.loop import get_latest_description
-from party.vision.log import get_recent_entries
+from party.orchestration.context import (
+    WarmContext,
+    build_warm_context,
+    format_warm_primary,
+    format_warm_companion,
+    build_primary_message,
+    build_companion_sequential_message,
+    build_companion_parallel_message,
+    COMPANION_SEQUENTIAL_CLOSING,
+    COMPANION_PARALLEL_CLOSING,
+    NORMAL_CLOSING,
+)
 from party.config import settings
 from party.log import get_logger
 
 log = get_logger(__name__)
 
+# Re-export for backward compatibility with existing tests
+COMPANION_CLOSING = COMPANION_SEQUENTIAL_CLOSING
 
-async def _build_context_preamble() -> str:
-    """
-    Build the context preamble injected into every character call.
-    Reads session_context.txt fresh on every call.
-    """
-    parts = []
+# ── Speaker limits (Task 11.4) ────────────────────────────────────────────────
 
-    now = datetime.now()
-    parts.append(f"Current date and time: {now.strftime('%A %d %B %Y, %H:%M')}")
-    parts.append("You are currently in a live stream on Twitch. The streamer/user you are talking to is Moonie.")
+MAX_SPEAKERS_DEFAULT = 2   # 1 primary + 1 companion
+MAX_SPEAKERS_SYSTEM = 5    # full party for SYSTEM events
 
-    session = read_session_context()
-    if session:
-        parts.append("Session context:")
-        parts.append(session)
-
-    # Vision context (from background loop)
-    vision = get_latest_description()
-    if vision:
-        parts.append(f"Currently on screen: {vision}")
-
-    # Recent vision log entries
-    recent = get_recent_entries(settings.vision_log_max_context_entries)
-    if recent:
-        parts.append("Recent screen observations:")
-        parts.extend(f"  {entry}" for entry in recent)
-
-    # OBS Scene Awareness
-    scene = await get_current_scene()
-    parts.append(f"Current OBS Scene: {scene}")
-
-    # Stream Feats (Manual log)
-    feats_path = os.path.join("session", "stream_feats.txt")
-    if os.path.exists(feats_path):
-        try:
-            with open(feats_path, "r", encoding="utf-8") as f:
-                feats = f.read().strip()
-                if feats:
-                    parts.append("\nStream Feats and Milestones (Historical context):")
-                    parts.append(feats)
-        except Exception:
-            pass
-
-    return "\n".join(parts)
-
-
-COMPANION_CLOSING = (
-    "Now add a brief (1 sentence) unrequested comment to the conversation. "
-    "Acknowledge what was just said. Use natural social recall for any past events."
-)
-
-NORMAL_CLOSING = (
-    "Now respond as your character, aware of the current context "
-    "and what your party members just said. Use natural social recall for any "
-    "past events—do not recite dates or exact log entries."
-)
-
-
-def _count_sentences(text: str) -> int:
-    """Rough sentence count - splits on . ! ? followed by space or end."""
-    sentences = re.split(r'[.!?]+(?:\s|$)', text.strip())
-    return len([s for s in sentences if s.strip()])
-
+# ── Provider instances ────────────────────────────────────────────────────────
 
 PROVIDERS = {
     "anthropic": AnthropicProvider(),
-    "openai": OpenAIProvider(),
-    "gemini": GeminiProvider(),
-    "grok": GrokProvider(),
-    "deepseek": DeepSeekProvider(),
+    "openai":    OpenAIProvider(),
+    "gemini":    GeminiProvider(),
+    "grok":      GrokProvider(),
+    "deepseek":  DeepSeekProvider(),
 }
 
 
-async def call_character(character: Character, session_snapshot: str, messages: list[dict]) -> CharacterResponse:
-    """Call a single character's provider. Exposed for testing/mocking."""
+# ── Budget and timeout helpers (Tasks 11.12, 11.13, 11.17, 11.18) ─────────────
+
+_BUDGET_MAP: dict[TriggerType, str] = {
+    TriggerType.HOTKEY:       "fast",
+    TriggerType.IDLE:         "fast",
+    TriggerType.SYSTEM:       "normal",
+    TriggerType.CHAT_TRIGGER: "normal",
+    TriggerType.STT:          "normal",
+    TriggerType.TIMED:        "normal",
+}
+
+
+def _get_budget(trigger_type: TriggerType) -> int:
+    """Return latency budget in milliseconds for this trigger class."""
+    cls = _BUDGET_MAP.get(trigger_type, "normal")
+    if cls == "fast":
+        return settings.latency_budget_fast_ms
+    if cls == "extended":
+        return settings.latency_budget_extended_ms
+    return settings.latency_budget_normal_ms
+
+
+def _get_provider_timeout(trigger_type: TriggerType) -> float:
+    """Return per-provider timeout in seconds for this trigger class."""
+    cls = _BUDGET_MAP.get(trigger_type, "normal")
+    if cls == "fast":
+        return settings.provider_timeout_fast_seconds
+    if cls == "extended":
+        return settings.provider_timeout_extended_seconds
+    return settings.provider_timeout_normal_seconds
+
+
+def _get_provider_retries(trigger_type: TriggerType) -> int:
+    """Return max retries for this trigger class."""
+    cls = _BUDGET_MAP.get(trigger_type, "normal")
+    if cls == "fast":
+        return settings.provider_retries_fast
+    return settings.provider_retries_normal
+
+
+# ── Speaker limit enforcement (Task 11.4) ─────────────────────────────────────
+
+def _enforce_speaker_limits(trigger: Trigger, result: RouterResult) -> None:
+    limit = MAX_SPEAKERS_SYSTEM if trigger.type == TriggerType.SYSTEM else MAX_SPEAKERS_DEFAULT
+    total = len(result.primary) + len(result.companions)
+    if total > limit:
+        result.companions = result.companions[:limit - len(result.primary)]
+        log.warning(
+            "speaker_limit_enforced",
+            trigger_id=trigger.trigger_id,
+            original=total,
+            clamped=limit,
+        )
+
+
+# ── Character call interface ──────────────────────────────────────────────────
+
+async def call_character(
+    character: Character,
+    session_snapshot: str,
+    messages: list[dict],
+    *,
+    timeout: float = 10.0,
+    max_retries: int = 1,
+) -> CharacterResponse:
+    """
+    Call a single character's provider. Exposed for testing/mocking.
+    session_snapshot is injected into the system prompt as [SESSION SNAPSHOT].
+    """
     full_system_prompt = f"{character.prompt}\n\n[SESSION SNAPSHOT]\n{session_snapshot}"
     return await PROVIDERS[character.provider_type].call(
         character,
         full_system_prompt,
         messages,
+        timeout=timeout,
+        max_retries=max_retries,
     )
 
 
-async def run_chain(
+# ── Response repair helper ────────────────────────────────────────────────────
+
+def _repair(response: CharacterResponse, trigger: Trigger, name: str) -> CharacterResponse:
+    repair = repair_response(response.text, trigger_id=trigger.trigger_id, character_name=name)
+    if repair.length_violation:
+        log.warning(
+            "repair.length_violation",
+            trigger_id=trigger.trigger_id,
+            character=name,
+            sentence_count=repair.sentence_count,
+            limit=SENTENCE_LIMITS.get(name, 5),
+        )
+    log.info(
+        "provider.call_end",
+        trigger_id=trigger.trigger_id,
+        character=name,
+        provider=response.provider,
+        latency_ms=response.latency_ms,
+    )
+    return response.model_copy(update={
+        "text": repair.text,
+        "repaired": repair.repaired,
+        "length_chars": len(repair.text),
+        "length_sentences": repair.sentence_count,
+    })
+
+
+# ── Parallel execution (Task 11.7) ────────────────────────────────────────────
+
+async def _run_parallel(
     trigger: Trigger,
-    character_names: list[str],
-    companion_characters: Optional[set[str]] = None,
+    result: RouterResult,
+    warm: WarmContext,
+    budget_ms: int,
+    p_timeout: float,
+    p_retries: int,
 ) -> AsyncGenerator[CharacterResponse, None]:
     """
-    Calls characters. If TriggerType is SYSTEM, calls in parallel.
-    Otherwise, calls sequentially to allow building on context.
-    Yields CharacterResponse objects as they are ready.
+    Fire primary and all companions simultaneously via asyncio tasks.
+    Primary result is yielded first; companions yielded if within budget.
+    Task 11.3 — parallel companion context: no primary response included.
     """
-    session_snapshot = await _build_context_preamble()
-    
-    # Parallel execution for SYSTEM events to minimize actual latency
-    if trigger.type == TriggerType.SYSTEM:
-        log.info("chain.parallel_execution", trigger_id=trigger.trigger_id, count=len(character_names))
-        
-        context_messages = [{"role": "user", "content": f"System event: {trigger.text}"}]
-        tasks = []
-        for name in character_names:
-            tasks.append(call_character(CHARACTERS[name], session_snapshot, context_messages))
-        
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for i, res in enumerate(results):
-            name = character_names[i]
-            if isinstance(res, Exception):
-                log.error("provider.error", trigger_id=trigger.trigger_id, character=name, reason=str(res))
-                continue
-            
-            # Repair and yield
-            repair = repair_response(res.text, trigger_id=trigger.trigger_id, character_name=name)
-            response = res.model_copy(update={
-                "text": repair.text,
-                "repaired": repair.repaired,
-                "length_chars": len(repair.text),
-                "length_sentences": repair.sentence_count,
-            })
-            yield response
+    primary_name = result.primary[0]
+    companion_names = result.companions
+
+    snap_primary = format_warm_primary(warm)
+    snap_companion = format_warm_companion(warm)
+    primary_msgs = build_primary_message(trigger, warm)
+
+    # Create all tasks immediately so they all start at once
+    primary_task = asyncio.create_task(
+        call_character(CHARACTERS[primary_name], snap_primary, primary_msgs,
+                       timeout=p_timeout, max_retries=p_retries)
+    )
+    companion_tasks: list[tuple[str, asyncio.Task]] = []
+    for name in companion_names:
+        msgs = build_companion_parallel_message(trigger, warm)
+        companion_tasks.append((name, asyncio.create_task(
+            call_character(CHARACTERS[name], snap_companion, msgs,
+                           timeout=p_timeout, max_retries=p_retries)
+        )))
+
+    t_start = time.perf_counter()
+
+    # Await primary first
+    try:
+        primary_response = await primary_task
+        primary_response = _repair(primary_response, trigger, primary_name)
+    except Exception as e:
+        log.error("provider.error", trigger_id=trigger.trigger_id,
+                  character=primary_name, reason=str(e))
+        for _, task in companion_tasks:
+            task.cancel()
         return
 
-    # Sequential execution for conversation/idle
-    results = []
-    if trigger.type == TriggerType.IDLE:
-        context_messages = [{"role": "user", "content": "Start an idle conversation based on the current scene and context."}]
-    else:
-        context_messages = [{"role": "user", "content": f"Moonie said: {trigger.text}"}]
+    # Capture LLM-only elapsed time BEFORE yielding — yield suspends until TTS finishes,
+    # which would inflate elapsed_ms and incorrectly cancel companion tasks.
+    primary_llm_elapsed_ms = (time.perf_counter() - t_start) * 1000
 
-    for i, name in enumerate(character_names):
-        character = CHARACTERS[name]
-        log.info("provider.call_start", trigger_id=trigger.trigger_id, character=name, provider=character.provider_type)
+    yield primary_response
 
-        try:
-            response = await call_character(character, session_snapshot, context_messages)
-
-            # Repair output
-            repair = repair_response(response.text, trigger_id=trigger.trigger_id, character_name=name)
-            response = response.model_copy(
-                update={
-                    "text": repair.text,
-                    "repaired": repair.repaired,
-                    "length_chars": len(repair.text),
-                    "length_sentences": repair.sentence_count,
-                }
-            )
-
-            log.info(
-                "provider.call_end",
-                trigger_id=trigger.trigger_id,
-                character=name,
-                provider=character.provider_type,
-                latency_ms=response.latency_ms,
-            )
-            results.append(response)
-            yield response  # Yield immediately for incremental delivery!
-
-        except ProviderError as e:
-            log.error("provider.error", trigger_id=trigger.trigger_id, character=name, provider=e.provider, reason=e.reason)
+    # Await companions (Task 11.14).
+    # Companion tasks have been running concurrently during primary LLM + TTS playback.
+    # If the task is already done (completed during TTS), yield it immediately.
+    # Only apply budget check if the task is still pending — using LLM-phase elapsed time.
+    for companion_name, task in companion_tasks:
+        if task.done():
+            try:
+                companion_response = task.result()
+                companion_response = _repair(companion_response, trigger, companion_name)
+                yield companion_response
+            except Exception as e:
+                log.error("provider.error", trigger_id=trigger.trigger_id,
+                          character=companion_name, reason=str(e))
             continue
+        remaining_ms = budget_ms - primary_llm_elapsed_ms
+        if remaining_ms <= 0:
+            log.warning(
+                "budget_exceeded_skipping_companion",
+                trigger_id=trigger.trigger_id,
+                trigger_type=str(trigger.type),
+                elapsed_ms=round(primary_llm_elapsed_ms),
+                budget_ms=budget_ms,
+            )
+            task.cancel()
+            continue
+        try:
+            companion_response = await asyncio.wait_for(task, timeout=remaining_ms / 1000)
+            companion_response = _repair(companion_response, trigger, companion_name)
+            yield companion_response
+        except asyncio.TimeoutError:
+            log.warning("companion_timeout", trigger_id=trigger.trigger_id,
+                        character=companion_name, budget_ms=budget_ms)
+        except Exception as e:
+            log.error("provider.error", trigger_id=trigger.trigger_id,
+                      character=companion_name, reason=str(e))
 
-        # Build context for next character
-        next_name = character_names[i + 1] if i + 1 < len(character_names) else None
-        is_companion = (
-            companion_characters is not None
-            and next_name is not None
-            and next_name in companion_characters
+
+# ── Sequential execution ──────────────────────────────────────────────────────
+
+async def _run_sequential(
+    trigger: Trigger,
+    result: RouterResult,
+    warm: WarmContext,
+    budget_ms: int,
+    p_timeout: float,
+    p_retries: int,
+) -> AsyncGenerator[CharacterResponse, None]:
+    """
+    Call primary, then companion (with primary's response in context) if within budget.
+    Task 11.3 — sequential companion context: primary response included.
+    Task 11.11 — fixed window: companion gets only primary's response, not full history.
+    """
+    primary_name = result.primary[0]
+    companion_names = result.companions
+
+    snap_primary = format_warm_primary(warm)
+    snap_companion = format_warm_companion(warm)
+    primary_msgs = build_primary_message(trigger, warm)
+
+    t_start = time.perf_counter()
+
+    try:
+        log.info("provider.call_start", trigger_id=trigger.trigger_id,
+                 character=primary_name, provider=CHARACTERS[primary_name].provider_type)
+        primary_response = await call_character(
+            CHARACTERS[primary_name], snap_primary, primary_msgs,
+            timeout=p_timeout, max_retries=p_retries,
         )
-        summary_lines = [
-            f"Moonie said: {trigger.text}" if trigger.type != TriggerType.IDLE else "Current Situation: Idle chatter",
-            "",
-        ]
-        for r in results:
-            summary_lines.append(f"{r.display_name} said: {r.text}")
-        if results:
-            summary_lines.append("")
+        primary_response = _repair(primary_response, trigger, primary_name)
+        yield primary_response
+    except Exception as e:
+        log.error("provider.error", trigger_id=trigger.trigger_id,
+                  character=primary_name, reason=str(e))
+        return
 
-        if is_companion:
-            closing = COMPANION_CLOSING
-        else:
-            closing = NORMAL_CLOSING
+    primary_elapsed_ms = (time.perf_counter() - t_start) * 1000
 
-        summary_lines.append(closing)
-        context_messages = [{"role": "user", "content": "\n".join(summary_lines)}]
+    if not companion_names:
+        return
 
+    companion_name = companion_names[0]
+
+    # Budget enforcement (Task 11.14)
+    if primary_elapsed_ms > budget_ms:
+        log.warning(
+            "budget_exceeded_skipping_companion",
+            trigger_id=trigger.trigger_id,
+            trigger_type=str(trigger.type),
+            elapsed_ms=round(primary_elapsed_ms),
+            budget_ms=budget_ms,
+        )
+        return
+
+    # Companion receives primary's response — no full history (Task 11.11)
+    companion_msgs = build_companion_sequential_message(
+        trigger, warm,
+        primary_response.display_name,
+        primary_response.text,
+    )
+
+    try:
+        log.info("provider.call_start", trigger_id=trigger.trigger_id,
+                 character=companion_name, provider=CHARACTERS[companion_name].provider_type)
+        companion_response = await call_character(
+            CHARACTERS[companion_name], snap_companion, companion_msgs,
+            timeout=p_timeout, max_retries=p_retries,
+        )
+        companion_response = _repair(companion_response, trigger, companion_name)
+        yield companion_response
+    except Exception as e:
+        log.error("provider.error", trigger_id=trigger.trigger_id,
+                  character=companion_name, reason=str(e))
+
+
+# ── Public chain interface ────────────────────────────────────────────────────
+
+async def run_chain(
+    trigger: Trigger,
+    router_result: RouterResult,
+) -> AsyncGenerator[CharacterResponse, None]:
+    """
+    Execute the character chain for a routed trigger.
+    Dispatches to _run_parallel or _run_sequential based on RouterResult.mode.
+    Yields CharacterResponse objects as they are ready.
+    """
+    from party.context.obs_context import get_current_scene
+    try:
+        scene = await get_current_scene()
+    except Exception:
+        scene = "Unknown"
+
+    warm = await build_warm_context(scene=scene)
+    budget_ms = _get_budget(trigger.type)
+    p_timeout = _get_provider_timeout(trigger.type)
+    p_retries = _get_provider_retries(trigger.type)
+
+    if router_result.mode == ExecutionMode.PARALLEL:
+        async for response in _run_parallel(trigger, router_result, warm, budget_ms, p_timeout, p_retries):
+            yield response
+    else:
+        async for response in _run_sequential(trigger, router_result, warm, budget_ms, p_timeout, p_retries):
+            yield response
+
+
+# ── Orchestrate (full pipeline) ───────────────────────────────────────────────
 
 async def orchestrate(trigger: Trigger) -> AsyncGenerator[Any, None]:
     """
     Full orchestration pipeline. Yields:
-    1. (metadata) dict with character_names, router_method
-    2. (results) CharacterResponse objects as they finish
-    3. (final) Scene object (for persistence)
+    1. dict — metadata: {event, characters, method}
+    2. CharacterResponse objects as they complete
+    3. Scene — final scene object (for persistence/transcript)
     """
     start = time.monotonic()
 
-    character_names, router_method, companion_set = await _route_with_method(trigger)
-    
-    # Yield initial metadata so overlay/speech can prepare if needed
+    result: RouterResult = await route_trigger(trigger)
+    _enforce_speaker_limits(trigger, result)
+
+    all_characters = result.primary + result.companions
     yield {
         "event": "orchestration_start",
-        "characters": character_names,
-        "method": router_method,
+        "characters": all_characters,
+        "method": result.method,
     }
 
-    final_results = []
-    async for response in run_chain(trigger, character_names, companion_characters=companion_set):
+    final_results: list[CharacterResponse] = []
+    async for response in run_chain(trigger, result):
         final_results.append(response)
         yield response
 
     total_latency_ms = int((time.monotonic() - start) * 1000)
-    
     error = "all_providers_failed" if not final_results else None
+
     scene = Scene(
         trigger=trigger,
-        characters=character_names,
+        characters=all_characters,
         responses=final_results,
-        router_method=router_method,
+        router_method=result.method,
         total_latency_ms=total_latency_ms,
         error=error,
     )
-    
-    if not error:
-        log.info("scene.complete", trigger_id=trigger.trigger_id, total_latency_ms=total_latency_ms)
-    
+
+    if error:
+        log.error("scene.error", trigger_id=trigger.trigger_id, reason=error)
+    else:
+        log.info("scene.complete", trigger_id=trigger.trigger_id,
+                 total_latency_ms=total_latency_ms)
+
     yield scene

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
         env_file=_env_path,
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # API Keys - required
@@ -35,9 +36,19 @@ class Settings(BaseSettings):
     trigger_cooldown_seconds: float = 3.0
     dedup_window_seconds: float = 5.0
 
-    # Provider timeouts
-    provider_timeout_seconds: float = 15.0
-    provider_max_retries: int = 2
+    # Provider timeouts — per trigger class (seconds)
+    provider_timeout_fast_seconds: float = 5.0
+    provider_timeout_normal_seconds: float = 10.0
+    provider_timeout_extended_seconds: float = 15.0
+
+    # Provider retries — per trigger class
+    provider_retries_fast: int = 0
+    provider_retries_normal: int = 1
+
+    # Latency budgets — time from trigger to scene complete (ms)
+    latency_budget_fast_ms: int = 1500
+    latency_budget_normal_ms: int = 3000
+    latency_budget_extended_ms: int = 5000
 
     # ElevenLabs
     elevenlabs_api_key: str = ""

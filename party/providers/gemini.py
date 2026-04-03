@@ -1,3 +1,9 @@
+# PROVIDER AUDIT (Sprint 11)
+# SDK: google-genai
+# Async client available: YES — client.aio.models.generate_content()
+# Current implementation: sync client in run_in_executor
+# Action: migrated to client.aio async interface in Task 11.16
+
 import time
 from google import genai
 from google.genai import types
@@ -17,29 +23,24 @@ class GeminiProvider(BaseProvider):
         character: Character,
         system_prompt: str,
         messages: list[dict],
+        timeout: float = 10.0,
+        max_retries: int = 1,
     ) -> CharacterResponse:
         start = time.monotonic()
-
         full_prompt = self._build_system_prompt(character, system_prompt)
 
         async def _call():
-            import asyncio
-            loop = asyncio.get_event_loop()
-
             contents = []
             for msg in messages:
                 role = "user" if msg["role"] == "user" else "model"
                 contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
-            response = await loop.run_in_executor(
-                None,
-                lambda: self.client.models.generate_content(
-                    model=character.model_id,
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        system_instruction=full_prompt,
-                        max_output_tokens=1024,
-                    ),
+            response = await self.client.aio.models.generate_content(
+                model=character.model_id,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=full_prompt,
+                    max_output_tokens=1024,
                 ),
             )
             text = response.text.strip()
@@ -47,7 +48,6 @@ class GeminiProvider(BaseProvider):
             input_tokens = meta.prompt_token_count if meta else 0
             output_tokens = meta.candidates_token_count if meta else 0
 
-            # Log finish reason if not a clean stop
             try:
                 finish_reason = response.candidates[0].finish_reason
                 if str(finish_reason) not in ("FinishReason.STOP", "STOP", "1"):
@@ -63,7 +63,9 @@ class GeminiProvider(BaseProvider):
             return text, input_tokens, output_tokens
 
         try:
-            text, input_tokens, output_tokens = await self._with_timeout_and_retry(_call)
+            text, input_tokens, output_tokens = await self._with_timeout_and_retry(
+                _call, timeout=timeout, max_retries=max_retries
+            )
         except ProviderError:
             raise
         except Exception as e:
