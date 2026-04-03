@@ -22,9 +22,12 @@ HOW WE WORK
 When something happens - Moonie dies, chat asks a question, Moonie
 says something reactive out loud, or a timed observation fires - a
 trigger reaches the orchestrator. A routing system decides which of
-us should respond based on the content. We each call our own LLM
-with full context of what the others have said, so our responses
-build on each other rather than being independent.
+us should respond. For most triggers, one of us is the Lead and one
+other may chime in as a Companion. The Lead gets full context; the
+Companion gets a compressed brief. For chat triggers, the Companion
+hears what the Lead said and builds on it. For hotkeys and events,
+both of us react to the moment simultaneously without waiting for
+each other.
 
 We also listen to Moonie's microphone directly via Whisper STT. When
 he says something worth reacting to, we filter it through a fast
@@ -77,11 +80,11 @@ Streamer.bot sends triggers via WebSocket. The overlay animates in
 OBS as a browser source.
 
 Project statistics:
-- 5,110 lines of Python across 77 modules (source + tests)
-- ~800 lines of production HTML and CSS code
-- 727 lines of prompts and character sheets across 7 files
-- 117 automated tests (100% Passing)
-- Built across 12 core development sprints
+- 7,021 lines of Python across 80 modules (source + tests)
+- 878 lines of production HTML code
+- 841 lines of prompts and character sheets across 7 files
+- 147 automated tests (100% passing)
+- Built across 11 core development sprints
 
 Build history:
 - Character concepts and prototype began 6 March 2026

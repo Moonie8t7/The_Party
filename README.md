@@ -26,10 +26,11 @@ Each character is powered by a different Large Language Model, integrating Anthr
 
 * **Five-Model Ensemble Orchestration**: Routes responses through a cast of models (Claude Sonnet, GPT-4o, Gemini 2.5 Flash, DeepSeek, and Grok).
 * **Live Screen Reading**: Uses GPT-4o Vision in an asynchronous loop to capture bursts of gameplay frames and maintain a context description of broadcast visuals.
-* **Hardened Voice Triggers**: Utilizes a custom phonetic and fuzzy matching engine (116 tests passing) to intercept streamer speech and route triggers with high precision.
+* **Hardened Voice Triggers**: Utilizes a custom phonetic and fuzzy matching engine to intercept streamer speech and route triggers with high precision.
+* **Lead + Companion Architecture**: Each trigger selects a Lead character and up to one Companion. Hotkeys and events fire both simultaneously (parallel); chat triggers run sequentially so the Companion can hear and build on the Lead's response. Latency budgets (1.5s fast / 3s normal) ensure companions are dropped rather than delayed if the Lead runs slow.
 * **Autonomous Idle Interaction**: An intelligent background coordinator that monitors stream activity and triggers natural, in-character banter during idle moments (Startup, BRB, etc.).
 * **Concurrent TTS Pipelining**: ElevenLabs voice generation occurs in background worker threads. The system synthesises the audio of the following response while the current audio is playing, minimizing inter-response latency.
-* **Context Loading Efficiency**: Utilizes a static snapshot architecture. Historical game data and vision logs are compiled into the System Prompt instead of message loops, lowering context token consumption over long sessions.
+* **Context Loading Efficiency**: Tiered context architecture — full warm context for the Lead, compressed brief (~40% size) for the Companion. Historical game data and vision logs compiled into the system prompt rather than message loops, lowering token consumption over long sessions.
 * **Visual Overlay**: Displays an OBS Browser Source overlay with an auto-scrolling typewriter text format, aligned statically across the character portraits.
 * **OBS Scene Awareness**: Monitors active OBS scenes (Startup, BRB, Gaming, Chat, Post Game) to adjust character conversation styles and recaps.
 * **Session Analytics Dashboard**: Real-time monitoring of triggers, latency, token usage, and costs via a dedicated dashboard on port `8766`.
