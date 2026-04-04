@@ -1,0 +1,16 @@
+# THE PARTY — KEY EVENTS LOG
+# This file is permanent and cumulative. Do not clear it between streams.
+# Add entries manually when something worth remembering happens.
+# Format: [DATE] [GAME] — Description of what happened.
+# Keep entries concise — one or two sentences maximum.
+# The most recent 10 entries are injected into every character's context.
+#
+# Examples:
+# 2026-04-01 [Battlefield 6] — Moonie survived a full squad wipe as the
+#   last player standing, holding a bunker for 4 minutes before winning.
+# 2026-04-01 [Battlefield 6] — Chat named Moonie's favourite sniper
+#   rifle "The Librarian" after Clauven noted his patience with it.
+#
+# ── EVENTS ──────────────────────────────────────────────────────────────
+
+2026-04-02 [Battlefield 6] — The Party went live for the first time. All five characters spoke. Chat was delighted.

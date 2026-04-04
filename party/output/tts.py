@@ -23,7 +23,6 @@ async def generate(
         return None  # Placeholder logic handles simulation during play()
 
     try:
-        from elevenlabs.client import ElevenLabs 
         t_start = time.monotonic()
         log.info("tts.elevenlabs_start", character=character_name, chars=len(text))
 
@@ -61,6 +60,8 @@ async def play(audio_bytes: bytes | None, text: str, character_name: str) -> Non
     
     log.info("tts.timing", character=character_name, playback_ms=int((t_complete - t_start) * 1000))
     log.info("tts.elevenlabs_complete", character=character_name)
+
+
 _elevenlabs_client = None
 
 

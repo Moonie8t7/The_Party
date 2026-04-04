@@ -2,6 +2,58 @@ import json
 import random
 import re
 from dataclasses import dataclass, field
+
+# ── Conduct patterns ──────────────────────────────────────────────────────────
+# TOS_PATTERNS: racial, ethnic, and targeted slurs — hard violations.
+# Conservative by design: false positives are acceptable, false negatives are not.
+
+TOS_PATTERNS = [
+    r'\bn[i!1][g9][g9][e3]r',
+    r'\bn[i!1][g9][g9][a@]',
+    r'\bch[i!1]nk',
+    r'\bsp[i!1][ck]\b',
+    r'\bk[i!1]k[e3]',
+    r'\btr[a@]nn',
+    r'\bf[a@][g9][g9][o0]t',
+    r'\br[e3]t[a@]rd',
+    r'\bwh[o0]r[e3]',
+    r'\bsl[u]t',
+    r'\bc[u]nt',
+]
+
+# CONTROVERSY_PATTERNS: topics characters should sidestep rather than engage.
+CONTROVERSY_PATTERNS = [
+    r'\bpolitics?\b', r'\bpolitical\b',
+    r'\belection\b', r'\bvoting\b', r'\bvoter\b',
+    r'\brepublican\b', r'\bdemocrat\b', r'\btory\b', r'\blabour party\b',
+    r'\btrump\b', r'\bbiden\b', r'\bstarmer\b', r'\bsunak\b',
+    r'\bpalestine\b', r'\bisrael\b', r'\bpalestinian\b', r'\bisraeli\b',
+    r'\bislam\b', r'\bmuslim\b', r'\bchristianity\b', r'\bjudaism\b',
+    r'\batheism\b', r'\bgod exists\b', r'\bdoes god\b',
+    r'\babortion\b', r'\bpro.?life\b', r'\bpro.?choice\b',
+    r'\bblack lives\b', r'\bblm\b', r'\bwhite supremac\b',
+    r'\bimmigration\b', r'\billegal alien\b',
+    r'\bgun control\b', r'\bsecond amendment\b',
+    r'\bdeath penalty\b', r'\bcapital punishment\b',
+    r'\beuthanasia\b',
+]
+
+
+def check_conduct(text: str) -> tuple[str, str] | None:
+    """
+    Check trigger text for conduct violations.
+    Returns (violation_type, reason) or None if clean.
+    violation_type is "tos" or "controversy".
+    TOS check runs before controversy check.
+    """
+    lower = text.lower()
+    for pattern in TOS_PATTERNS:
+        if re.search(pattern, lower):
+            return ("tos", f"matched: {pattern}")
+    for pattern in CONTROVERSY_PATTERNS:
+        if re.search(pattern, lower):
+            return ("controversy", f"matched: {pattern}")
+    return None
 from typing import Optional
 from anthropic import AsyncAnthropic
 from party.config import settings
@@ -476,6 +528,31 @@ async def route_trigger(trigger: Trigger) -> RouterResult:
 async def _route_with_method(trigger: Trigger) -> RouterResult:
     """Internal router logic. Returns RouterResult."""
     mode = _get_mode(trigger.type)
+
+    # ── Conduct check — always first ──────────────────────────────────────────
+    conduct = check_conduct(trigger.text)
+    if conduct:
+        violation_type, reason = conduct
+        log.info(
+            "router.conduct_flag",
+            trigger_id=trigger.trigger_id,
+            violation_type=violation_type,
+            reason=reason,
+        )
+        if violation_type == "tos":
+            return RouterResult(
+                primary=["geptima"],
+                companions=[],
+                method="conduct_tos",
+                mode=ExecutionMode.SEQUENTIAL,
+            )
+        else:
+            return RouterResult(
+                primary=["gemaux"],
+                companions=[],
+                method="conduct_controversy",
+                mode=ExecutionMode.SEQUENTIAL,
+            )
 
     # ── Redundancy check ──────────────────────────────────────────────────────
     if trigger.type == TriggerType.TIMED and "observe and comment" in trigger.text:

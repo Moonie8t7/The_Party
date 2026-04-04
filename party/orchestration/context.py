@@ -13,6 +13,7 @@ from datetime import datetime
 from party.config import settings
 from party.models import Trigger, TriggerType
 from party.context.session import read_session_context
+from party.context.key_events import read_key_events, format_key_events_for_context
 from party.vision.loop import get_latest_description
 from party.vision.log import get_recent_entries
 from party.log import get_logger
@@ -58,6 +59,7 @@ class WarmContext:
     vision_current: str
     vision_recent: list[str] = field(default_factory=list)
     stream_feats: str = ""
+    key_events: list[str] = field(default_factory=list)
 
 
 async def build_warm_context(scene: str = "Unknown") -> WarmContext:
@@ -84,6 +86,8 @@ async def build_warm_context(scene: str = "Unknown") -> WarmContext:
         except Exception:
             pass
 
+    key_events = read_key_events()
+
     return WarmContext(
         timestamp=timestamp,
         scene=scene,
@@ -91,6 +95,7 @@ async def build_warm_context(scene: str = "Unknown") -> WarmContext:
         vision_current=vision_current,
         vision_recent=vision_recent,
         stream_feats=stream_feats,
+        key_events=key_events,
     )
 
 
@@ -108,6 +113,10 @@ def format_warm_primary(warm: WarmContext) -> str:
     if warm.session:
         parts.append("Session context:")
         parts.append(warm.session)
+    if warm.key_events:
+        formatted = format_key_events_for_context(warm.key_events)
+        if formatted:
+            parts.append(formatted)
     if warm.vision_current:
         parts.append(f"Currently on screen: {warm.vision_current}")
     recent = warm.vision_recent[:VISION_CONTEXT_ENTRIES["primary"]]
