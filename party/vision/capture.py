@@ -59,7 +59,12 @@ async def _capture_single() -> Optional[str]:
 
 
 def _capture_sync() -> Optional[str]:
-    """Synchronous OBS screenshot capture. Run in thread pool."""
+    """Synchronous OBS screenshot capture. Run in thread pool.
+
+    If vision_gameplay_source is configured, captures that named source
+    directly — bypassing the scene composite and avoiding overlay contamination.
+    Falls back to scene-level capture if no source is configured.
+    """
     import obsws_python as obs
 
     client = obs.ReqClient(
@@ -70,13 +75,19 @@ def _capture_sync() -> Optional[str]:
     )
 
     try:
-        from party.context.obs_context import _get_scene_sync
-        scene_name = _get_scene_sync()
-        if not scene_name:
-            return None
+        # Determine the source to screenshot.
+        # If a specific gameplay source is configured, use it directly.
+        # Otherwise fall back to the current scene (captures full composite).
+        if settings.vision_gameplay_source:
+            source_name = settings.vision_gameplay_source
+        else:
+            from party.context.obs_context import _get_scene_sync
+            source_name = _get_scene_sync()
+            if not source_name:
+                return None
 
         response = client.get_source_screenshot(
-            scene_name,
+            source_name,
             "png",
             1280,
             720,

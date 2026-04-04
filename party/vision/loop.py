@@ -14,9 +14,14 @@ from party.config import settings
 from party.vision.capture import capture_burst
 from party.vision.describe import describe_burst
 from party.vision import log as vision_log
+from party.context.obs_context import get_current_scene
 from party.log import get_logger
 
 log = get_logger(__name__)
+
+# Scenes in which vision capture is active.
+# Capture is skipped silently on all other scenes (BRB, Startup, Chat, Post Game).
+VISION_CAPTURE_SCENES = {"Gaming"}
 
 # Module-level storage for latest description
 _latest_description: Optional[str] = None
@@ -75,26 +80,32 @@ async def _run_loop():
     await asyncio.sleep(5.0)
 
     while True:
+        burst_start = time.monotonic()
+
         try:
-            burst_start = time.monotonic()
-
-            frames = await capture_burst()
-
-            if frames:
-                description = await describe_burst(frames)
-
-                if description:
-                    _latest_description = description
-                    vision_log.append_entry(description)
-                    log.info(
-                        "vision.description_updated",
-                        description=description[:80],
-                        frames_used=len(frames),
-                    )
-                else:
-                    log.debug("vision.description_empty")
+            # Scene gate — only capture during active gameplay.
+            # BRB, Startup, Chat, Post Game skipped silently.
+            scene = await get_current_scene()
+            if scene not in VISION_CAPTURE_SCENES:
+                log.debug("vision.skipped_non_gaming_scene", scene=scene)
             else:
-                log.debug("vision.burst_failed_silently")
+                frames = await capture_burst()
+
+                if frames:
+                    description = await describe_burst(frames)
+
+                    if description:
+                        _latest_description = description
+                        vision_log.append_entry(description)
+                        log.info(
+                            "vision.description_updated",
+                            description=description[:80],
+                            frames_used=len(frames),
+                        )
+                    else:
+                        log.debug("vision.description_empty")
+                else:
+                    log.debug("vision.burst_failed_silently")
 
         except asyncio.CancelledError:
             raise
@@ -102,7 +113,7 @@ async def _run_loop():
             log.warning("vision.loop_error", reason=str(e))
             burst_start = time.monotonic()
 
-        # Account for time spent capturing so the interval stays consistent
+        # Account for time spent so the interval stays consistent
         burst_duration = time.monotonic() - burst_start
         wait_time = max(settings.vision_interval_seconds - burst_duration, 10.0)
         await asyncio.sleep(wait_time)

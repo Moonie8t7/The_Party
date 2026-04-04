@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 import tempfile
 import os
@@ -167,3 +168,106 @@ async def test_stop_vision_loop_safe_when_not_started():
     from party.vision import loop as vision_loop
     vision_loop._loop_task = None
     await vision_loop.stop_vision_loop()
+
+
+# --- scene-gated loop and source-specific capture ---
+
+def test_vision_capture_scenes_constant_includes_gaming():
+    """VISION_CAPTURE_SCENES must include Gaming and exclude idle scenes."""
+    from party.vision.loop import VISION_CAPTURE_SCENES
+    assert "Gaming" in VISION_CAPTURE_SCENES
+    assert "BRB" not in VISION_CAPTURE_SCENES
+    assert "Startup" not in VISION_CAPTURE_SCENES
+    assert "Chat" not in VISION_CAPTURE_SCENES
+    assert "Post Game" not in VISION_CAPTURE_SCENES
+
+
+def test_capture_uses_gameplay_source_when_configured():
+    """When vision_gameplay_source is set, _capture_sync uses it as source_name."""
+    from party.vision import capture as vision_capture
+
+    captured_args = {}
+
+    def mock_get_source_screenshot(source_name, fmt, w, h, quality):
+        captured_args["source_name"] = source_name
+        mock_resp = MagicMock()
+        mock_resp.image_data = "data:image/png;base64,FAKEDATA"
+        return mock_resp
+
+    mock_client = MagicMock()
+    mock_client.get_source_screenshot.side_effect = mock_get_source_screenshot
+
+    with patch("party.vision.capture.settings") as mock_settings:
+        mock_settings.vision_gameplay_source = "Gameplay"
+        mock_settings.vision_obs_host = "localhost"
+        mock_settings.vision_obs_port = 4455
+        mock_settings.vision_obs_password = ""
+
+        with patch("obsws_python.ReqClient", return_value=mock_client):
+            result = vision_capture._capture_sync()
+
+    assert captured_args.get("source_name") == "Gameplay"
+    assert result == "FAKEDATA"
+
+
+def test_capture_falls_back_to_scene_when_source_not_configured():
+    """When vision_gameplay_source is empty, _capture_sync uses the scene name."""
+    from party.vision import capture as vision_capture
+
+    captured_args = {}
+
+    def mock_get_source_screenshot(source_name, fmt, w, h, quality):
+        captured_args["source_name"] = source_name
+        mock_resp = MagicMock()
+        mock_resp.image_data = "FAKEDATA"
+        return mock_resp
+
+    mock_client = MagicMock()
+    mock_client.get_source_screenshot.side_effect = mock_get_source_screenshot
+
+    with patch("party.vision.capture.settings") as mock_settings:
+        mock_settings.vision_gameplay_source = ""
+        mock_settings.vision_obs_host = "localhost"
+        mock_settings.vision_obs_port = 4455
+        mock_settings.vision_obs_password = ""
+
+        with patch("obsws_python.ReqClient", return_value=mock_client):
+            with patch(
+                "party.context.obs_context._get_scene_sync",
+                return_value="Gaming"
+            ):
+                result = vision_capture._capture_sync()
+
+    assert captured_args.get("source_name") == "Gaming"
+    assert result == "FAKEDATA"
+
+
+@pytest.mark.asyncio
+async def test_vision_loop_skips_capture_on_non_gaming_scene():
+    """Vision loop must not call capture_burst when scene is not Gaming."""
+    from party.vision import loop as vision_loop
+
+    capture_called = {"count": 0}
+
+    async def mock_capture_burst():
+        capture_called["count"] += 1
+        return []
+
+    with patch("party.vision.loop.get_current_scene", return_value="BRB"):
+        with patch("party.vision.loop.capture_burst", side_effect=mock_capture_burst):
+            with patch.object(vision_loop, "settings") as mock_settings:
+                mock_settings.vision_enabled = True
+                mock_settings.vision_interval_seconds = 0.05
+                mock_settings.vision_burst_frames = 1
+                mock_settings.vision_burst_interval_seconds = 0.0
+
+                # Run the loop task briefly then cancel it
+                task = asyncio.create_task(vision_loop._run_loop())
+                await asyncio.sleep(0.15)
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+    assert capture_called["count"] == 0, "capture_burst should not be called on BRB scene"

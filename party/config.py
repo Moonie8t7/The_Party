@@ -110,6 +110,11 @@ class Settings(BaseSettings):
     vision_log_max_file_entries: int = 100
     vision_log_path: str = "session/vision_log_{date}.txt"
 
+    # Vision source — which OBS source to capture when in Gaming scene.
+    # Must exactly match the source name as it appears in OBS.
+    # If empty, falls back to capturing the full scene (includes overlay).
+    vision_gameplay_source: str = ""
+
     # STT
     stt_enabled: bool = False
     stt_model: str = "base"
