@@ -91,12 +91,13 @@ class RouterResult:
 # ── ExecutionMode assignment per trigger type (Task 11.6) ─────────────────────
 
 _MODE_MAP: dict[TriggerType, ExecutionMode] = {
-    TriggerType.SYSTEM:       ExecutionMode.PARALLEL,
-    TriggerType.HOTKEY:       ExecutionMode.PARALLEL,
-    TriggerType.CHAT_TRIGGER: ExecutionMode.SEQUENTIAL,
-    TriggerType.STT:          ExecutionMode.SEQUENTIAL,
-    TriggerType.IDLE:         ExecutionMode.PARALLEL,
-    TriggerType.TIMED:        ExecutionMode.SEQUENTIAL,
+    TriggerType.SYSTEM:        ExecutionMode.PARALLEL,
+    TriggerType.HOTKEY:        ExecutionMode.PARALLEL,
+    TriggerType.CHAT_TRIGGER:  ExecutionMode.SEQUENTIAL,
+    TriggerType.STT:           ExecutionMode.SEQUENTIAL,
+    TriggerType.IDLE:          ExecutionMode.PARALLEL,
+    TriggerType.TIMED:         ExecutionMode.SEQUENTIAL,
+    TriggerType.VIEWER_EVENT:  ExecutionMode.SEQUENTIAL,
 }
 
 

@@ -47,10 +47,15 @@ Before every response we receive:
   (from IGDB)
 - The current session context (objectives, notable moments, anything
   Moonie has written in before or during the stream)
+- Key events from previous sessions (significant moments logged
+  across the full run of the stream)
 - What is currently on screen (from the vision system)
 - Recent screen observations from the session log
 - Stream Feats and Milestones (manual log of achievements and Moonie's thoughts)
 - What the other party members just said
+- When welcoming a returning viewer, a brief memory of who they are —
+  how often they've been first chatter, their adventurer level, and
+  their history in the Dungeon Arcade
 
 DIRECT ADDRESS
 
@@ -80,17 +85,17 @@ Streamer.bot sends triggers via WebSocket. The overlay animates in
 OBS as a browser source.
 
 Project statistics:
-- 7,404 lines of Python across 83 modules (source + tests)
-- 878 lines of production HTML code
-- 916 lines of prompts and character sheets across 7 files
-- 164 automated tests (100% passing)
-- Built across 11 core development sprints
+- 7,984 lines of Python across 86 modules (source + tests)
+- 1,015 lines of production HTML/CSS/JS code
+- 917 lines of prompts and character sheets across 7 files
+- 185 automated tests (100% passing)
+- Built across 12 core development sprints
 
 Build history:
 - Character concepts and prototype began 6 March 2026
 - Full rebuild started 29 March 2026
 - Production launch reached 2 April 2026
-- Approximately 26.5 hours of active development across 5 calendar days
+- Approximately 26.5 hours of active development across 7 calendar days
 
 HOW TO REFERENCE THIS
 

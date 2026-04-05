@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from dataclasses import dataclass, field
 import uuid
 import os
@@ -27,6 +27,7 @@ class TriggerType(str, Enum):
     STT = "stt"
     SYSTEM = "system"
     IDLE = "idle"
+    VIEWER_EVENT = "viewer_event"
 
 
 class TriggerPriority(int, Enum):
@@ -37,11 +38,23 @@ class TriggerPriority(int, Enum):
 
 class IncomingTrigger(BaseModel):
     """Raw payload from Streamer.bot. Validated at intake."""
+    model_config = ConfigDict(extra="ignore")
+
     type: TriggerType
     text: str = Field(min_length=1, max_length=1000)
     priority: TriggerPriority = TriggerPriority.NORMAL
     cooldown_key: Optional[str] = None
     game: Optional[str] = None
+
+    # Viewer event fields — populated by Streamer.bot for viewer_event triggers.
+    # All optional; ignored for all other trigger types.
+    viewer: Optional[str] = None          # username
+    viewer_id: Optional[str] = None       # Twitch user ID
+    rank: Optional[int] = None            # 1, 2, or 3
+    history: Optional[dict] = None        # {"firsts": N, "seconds": N, "thirds": N}
+    roll: Optional[dict] = None           # {"value": N, "type": "nat1"|"nat20"|"normal"}
+    xp: Optional[int] = None             # total XP in XP system
+    level: Optional[int] = None          # current level (1–20)
 
 
 class Trigger(BaseModel):
@@ -53,6 +66,7 @@ class Trigger(BaseModel):
     priority: TriggerPriority
     cooldown_key: Optional[str]
     game: Optional[str]
+    viewer: Optional[str] = None    # username if this is a viewer_event
 
 
 class CharacterResponse(BaseModel):

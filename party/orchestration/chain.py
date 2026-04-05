@@ -52,12 +52,13 @@ PROVIDERS = {
 # ── Budget and timeout helpers (Tasks 11.12, 11.13, 11.17, 11.18) ─────────────
 
 _BUDGET_MAP: dict[TriggerType, str] = {
-    TriggerType.HOTKEY:       "fast",
-    TriggerType.IDLE:         "fast",
-    TriggerType.SYSTEM:       "normal",
-    TriggerType.CHAT_TRIGGER: "normal",
-    TriggerType.STT:          "normal",
-    TriggerType.TIMED:        "normal",
+    TriggerType.HOTKEY:        "fast",
+    TriggerType.IDLE:          "fast",
+    TriggerType.SYSTEM:        "normal",
+    TriggerType.CHAT_TRIGGER:  "normal",
+    TriggerType.STT:           "normal",
+    TriggerType.TIMED:         "normal",
+    TriggerType.VIEWER_EVENT:  "normal",
 }
 
 
@@ -340,7 +341,7 @@ async def run_chain(
     except Exception:
         scene = "Unknown"
 
-    warm = await build_warm_context(scene=scene)
+    warm = await build_warm_context(scene=scene, viewer=trigger.viewer)
     budget_ms = _get_budget(trigger.type)
     p_timeout = _get_provider_timeout(trigger.type)
     p_retries = _get_provider_retries(trigger.type)

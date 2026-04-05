@@ -10,10 +10,12 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from typing import Optional
 from party.config import settings
 from party.models import Trigger, TriggerType
 from party.context.session import read_session_context
 from party.context.key_events import read_key_events, format_key_events_for_context
+from party.context.viewer_memory import get_viewer, format_viewer_context
 from party.vision.loop import get_latest_description
 from party.vision.log import get_recent_entries
 from party.log import get_logger
@@ -60,9 +62,10 @@ class WarmContext:
     vision_recent: list[str] = field(default_factory=list)
     stream_feats: str = ""
     key_events: list[str] = field(default_factory=list)
+    viewer_context: str = ""
 
 
-async def build_warm_context(scene: str = "Unknown") -> WarmContext:
+async def build_warm_context(scene: str = "Unknown", viewer: Optional[str] = None) -> WarmContext:
     """
     Build the warm context for a trigger. Async because session/vision reads
     may involve file I/O. Called once per trigger; shared across all character calls.
@@ -88,6 +91,12 @@ async def build_warm_context(scene: str = "Unknown") -> WarmContext:
 
     key_events = read_key_events()
 
+    viewer_context = ""
+    if viewer:
+        viewer_data = await get_viewer(viewer)
+        if viewer_data:
+            viewer_context = format_viewer_context(viewer_data, viewer)
+
     return WarmContext(
         timestamp=timestamp,
         scene=scene,
@@ -96,6 +105,7 @@ async def build_warm_context(scene: str = "Unknown") -> WarmContext:
         vision_recent=vision_recent,
         stream_feats=stream_feats,
         key_events=key_events,
+        viewer_context=viewer_context,
     )
 
 
@@ -117,6 +127,8 @@ def format_warm_primary(warm: WarmContext) -> str:
         formatted = format_key_events_for_context(warm.key_events)
         if formatted:
             parts.append(formatted)
+    if warm.viewer_context:
+        parts.append(f"Viewer context: {warm.viewer_context}")
     if warm.vision_current:
         parts.append(f"Currently on screen: {warm.vision_current}")
     recent = warm.vision_recent[:VISION_CONTEXT_ENTRIES["primary"]]

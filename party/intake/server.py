@@ -1,8 +1,8 @@
-﻿import json
+import json
 import websockets
 from typing import Callable, Awaitable
 from pydantic import ValidationError
-from party.models import IncomingTrigger, Trigger
+from party.models import IncomingTrigger, Trigger, TriggerType
 from party.log import get_logger
 import structlog
 
@@ -15,21 +15,42 @@ async def handle_message(
 ) -> None:
     """
     Parse, validate, and enqueue a single raw WebSocket message.
-    Extracted for testability - no WebSocket dependency.
+    For viewer_event triggers, also updates viewer memory before enqueueing.
     """
-    # Parse JSON
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
         log.warning("intake.bad_json", raw=raw[:200])
         return
 
-    # Validate against IncomingTrigger model
     try:
         incoming = IncomingTrigger.model_validate(data)
     except ValidationError as e:
         log.warning("intake.invalid_payload", errors=str(e), data=str(data)[:200])
         return
+
+    # For viewer events, update memory before enqueueing.
+    # This is silent — a failure here must not prevent the trigger from processing.
+    if incoming.type == TriggerType.VIEWER_EVENT and incoming.viewer:
+        try:
+            from party.context.viewer_memory import update_viewer
+            viewer_data = {}
+            if incoming.history:
+                viewer_data.update(incoming.history)  # firsts, seconds, thirds
+            if incoming.level is not None:
+                viewer_data["level"] = incoming.level
+            if incoming.xp is not None:
+                viewer_data["xp"] = incoming.xp
+            if incoming.rank is not None:
+                viewer_data["last_rank"] = incoming.rank
+            if incoming.roll:
+                roll_history = viewer_data.get("roll_history", [])
+                roll_history.append(incoming.roll.get("value"))
+                viewer_data["roll_history"] = roll_history[-20:]  # keep last 20
+            await update_viewer(incoming.viewer, viewer_data)
+        except Exception as e:
+            log.warning("intake.viewer_memory_update_failed",
+                        viewer=incoming.viewer, reason=str(e))
 
     # Enrich to Trigger
     trigger = Trigger(
@@ -38,6 +59,7 @@ async def handle_message(
         priority=incoming.priority,
         cooldown_key=incoming.cooldown_key,
         game=incoming.game,
+        viewer=incoming.viewer,
     )
 
     structlog.contextvars.bind_contextvars(trigger_id=trigger.trigger_id)
@@ -47,6 +69,7 @@ async def handle_message(
         type=trigger.type,
         text=trigger.text[:60],
         priority=trigger.priority,
+        viewer=trigger.viewer,
     )
 
     await enqueue_fn(trigger)
