@@ -33,7 +33,7 @@ async def handle_message(
     # Silent — failure here must never block the trigger from processing.
     if incoming.viewer:
         try:
-            from party.context.viewer_memory import update_viewer
+            from party.context.viewer_memory import update_viewer, get_viewer
             viewer_data = {}
 
             # First chatter fields (viewer_event triggers)
@@ -50,9 +50,23 @@ async def handle_message(
                 roll_history.append(incoming.roll.get("value"))
                 viewer_data["roll_history"] = roll_history[-20:]
 
-            # Generic event data (raid, sub, gift sub — system triggers)
+            # Event data — d20 counters require reading stored values to increment correctly
             if incoming.event_data:
-                viewer_data.update(incoming.event_data)
+                ed = incoming.event_data
+                if "d20_roll" in ed:
+                    stored = await get_viewer(incoming.viewer) or {}
+                    roll_type = ed.get("d20_type", "normal")
+                    viewer_data["d20_rolls_total"] = stored.get("d20_rolls_total", 0) + 1
+                    viewer_data["last_d20"] = ed["d20_roll"]
+                    if roll_type == "nat20":
+                        viewer_data["d20_nat20s"] = stored.get("d20_nat20s", 0) + 1
+                    elif roll_type == "nat1":
+                        viewer_data["d20_nat1s"] = stored.get("d20_nat1s", 0) + 1
+                    for k, v in ed.items():
+                        if k not in ("d20_roll", "d20_type"):
+                            viewer_data[k] = v
+                else:
+                    viewer_data.update(ed)
 
             await update_viewer(incoming.viewer, viewer_data)
         except Exception as e:

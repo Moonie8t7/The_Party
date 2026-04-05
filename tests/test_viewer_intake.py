@@ -120,3 +120,100 @@ def test_trigger_has_viewer_field():
         viewer="MoonFan",
     )
     assert t.viewer == "MoonFan"
+
+
+# ── Sprint 14: d20 intake accumulation ───────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_d20_nat20_increments_counter():
+    """d20_nat20s counter must increment, not overwrite, in viewer memory."""
+    from party.intake.server import handle_message
+    from party.context import viewer_memory as vm
+
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "viewer_memory.json")
+        with patch.object(vm, "VIEWER_MEMORY_PATH", path):
+            vm._memory = {}
+            vm._loaded = False
+
+            async def enqueue(t): pass
+
+            # First nat20
+            payload1 = '''{
+                "type": "system", "text": "Rolled 20!",
+                "viewer": "RollerFan", "viewer_id": "999",
+                "event_data": {"d20_roll": 20, "d20_type": "nat20"}
+            }'''
+            await handle_message(payload1, enqueue)
+
+            # Second nat20
+            payload2 = '''{
+                "type": "system", "text": "Rolled 20 again!",
+                "viewer": "RollerFan", "viewer_id": "999",
+                "event_data": {"d20_roll": 20, "d20_type": "nat20"}
+            }'''
+            await handle_message(payload2, enqueue)
+
+            result = await vm.get_viewer("RollerFan")
+
+        assert result is not None
+        assert result.get("d20_nat20s") == 2
+        assert result.get("d20_rolls_total") == 2
+
+
+@pytest.mark.asyncio
+async def test_d20_nat1_increments_counter():
+    """d20_nat1s counter must increment correctly."""
+    from party.intake.server import handle_message
+    from party.context import viewer_memory as vm
+
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "viewer_memory.json")
+        with patch.object(vm, "VIEWER_MEMORY_PATH", path):
+            vm._memory = {}
+            vm._loaded = False
+
+            async def enqueue(t): pass
+
+            payload = '''{
+                "type": "system", "text": "Fumbled!",
+                "viewer": "FumbleFan", "viewer_id": "888",
+                "event_data": {"d20_roll": 1, "d20_type": "nat1"}
+            }'''
+            await handle_message(payload, enqueue)
+
+            result = await vm.get_viewer("FumbleFan")
+
+        assert result.get("d20_nat1s") == 1
+
+
+@pytest.mark.asyncio
+async def test_d20_normal_roll_updates_total_only():
+    """Normal d20 rolls increment total count but not nat1/nat20 counters."""
+    from party.intake.server import handle_message
+    from party.context import viewer_memory as vm
+
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "viewer_memory.json")
+        with patch.object(vm, "VIEWER_MEMORY_PATH", path):
+            vm._memory = {}
+            vm._loaded = False
+
+            async def enqueue(t): pass
+
+            payload = '''{
+                "type": "system", "text": "Rolled 12.",
+                "viewer": "NormalFan", "viewer_id": "777",
+                "event_data": {"d20_roll": 12, "d20_type": "normal"}
+            }'''
+            await handle_message(payload, enqueue)
+
+            result = await vm.get_viewer("NormalFan")
+
+        assert result.get("d20_rolls_total") == 1
+        assert result.get("d20_nat20s", 0) == 0
+        assert result.get("d20_nat1s", 0) == 0
+        assert result.get("last_d20") == 12
