@@ -163,6 +163,8 @@ def build_primary_message(trigger: Trigger, warm: WarmContext) -> list[dict]:
     """
     if trigger.type == TriggerType.SYSTEM:
         content = f"System event: {trigger.text}"
+    elif trigger.type == TriggerType.VIEWER_EVENT:
+        content = f"Stream event: {trigger.text}"
     elif trigger.type == TriggerType.IDLE:
         content = "Start an idle conversation based on the current scene and context."
     else:
@@ -183,6 +185,8 @@ def build_companion_sequential_message(
     """
     if trigger.type == TriggerType.IDLE:
         situation = "Current Situation: Idle chatter"
+    elif trigger.type == TriggerType.VIEWER_EVENT:
+        situation = f"Stream event: {trigger.text}"
     else:
         situation = f"Moonie said: {trigger.text}"
 

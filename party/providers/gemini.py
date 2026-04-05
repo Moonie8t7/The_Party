@@ -40,7 +40,7 @@ class GeminiProvider(BaseProvider):
                 contents=contents,
                 config=types.GenerateContentConfig(
                     system_instruction=full_prompt,
-                    max_output_tokens=1024,
+                    max_output_tokens=600,
                 ),
             )
             text = response.text.strip()

@@ -56,6 +56,10 @@ class IncomingTrigger(BaseModel):
     xp: Optional[int] = None             # total XP in XP system
     level: Optional[int] = None          # current level (1–20)
 
+    # Generic event-specific data for memory storage (Sprint 13).
+    # Used by raids, subs, gift subs, gift bombs.
+    event_data: Optional[dict] = None
+
 
 class Trigger(BaseModel):
     """Enriched trigger with system-assigned fields."""

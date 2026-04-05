@@ -97,11 +97,10 @@ async def update_viewer(username: str, data: dict) -> None:
 
 def format_viewer_context(viewer_data: dict, username: str) -> str:
     """
-    Convert a viewer's memory record into a natural language context line
-    for injection into warm primary context.
+    Convert a viewer's memory record into natural language for warm primary context.
 
-    This must never surface raw numbers as a stat dump. One or two sentences,
-    written as a memory, not a readout.
+    Covers first chatter history, raider history, and subscriber status.
+    Never produces a stat dump — one or two sentences, written as a memory.
     """
     if not viewer_data or not username:
         return ""
@@ -110,15 +109,40 @@ def format_viewer_context(viewer_data: dict, username: str) -> str:
     seconds = viewer_data.get("seconds", 0)
     thirds = viewer_data.get("thirds", 0)
     level = viewer_data.get("level", 1)
-    total = firsts + seconds + thirds
+    total_chatter = firsts + seconds + thirds
 
-    if total == 0 and level <= 1:
+    is_raider = viewer_data.get("raider", False)
+    last_raid_viewers = viewer_data.get("last_raid_viewers")
+
+    is_subscriber = viewer_data.get("subscriber", False)
+    sub_months = viewer_data.get("sub_months")
+    sub_tier = viewer_data.get("sub_tier")
+
+    is_gifted = viewer_data.get("gifted_sub", False)
+
+    # Nothing meaningful to surface
+    if total_chatter == 0 and level <= 1 and not is_raider and not is_subscriber and not is_gifted:
         return ""
 
     parts = []
 
-    if total > 0:
+    if is_raider:
+        raid_note = f"with {last_raid_viewers} viewers" if last_raid_viewers else ""
+        parts.append(f"{username} has raided the Dungeon Arcade before{(' ' + raid_note).rstrip()}.")
+    elif total_chatter > 0:
         parts.append(f"{username} is a familiar presence in the Dungeon Arcade.")
+    elif is_subscriber or is_gifted:
+        parts.append(f"{username} is known to the Dungeon Arcade.")
+
+    if is_subscriber and sub_months:
+        tier_note = f" ({sub_tier})" if sub_tier and sub_tier not in ("tier 1", "prime") else ""
+        parts.append(
+            f"They have been a subscriber for {sub_months} month{'s' if sub_months != 1 else ''}{tier_note}."
+        )
+    elif is_gifted:
+        parts.append("They were gifted a subscription by the community.")
+
+    if total_chatter > 0 and not is_raider:
         if firsts >= 5:
             parts.append(f"They are a frequent early arrival — first chatter {firsts} times.")
         elif firsts > 0:

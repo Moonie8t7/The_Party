@@ -2,7 +2,7 @@ import json
 import websockets
 from typing import Callable, Awaitable
 from pydantic import ValidationError
-from party.models import IncomingTrigger, Trigger, TriggerType
+from party.models import IncomingTrigger, Trigger
 from party.log import get_logger
 import structlog
 
@@ -15,7 +15,7 @@ async def handle_message(
 ) -> None:
     """
     Parse, validate, and enqueue a single raw WebSocket message.
-    For viewer_event triggers, also updates viewer memory before enqueueing.
+    Updates viewer memory for any trigger that carries a viewer field.
     """
     try:
         data = json.loads(raw)
@@ -29,12 +29,14 @@ async def handle_message(
         log.warning("intake.invalid_payload", errors=str(e), data=str(data)[:200])
         return
 
-    # For viewer events, update memory before enqueueing.
-    # This is silent — a failure here must not prevent the trigger from processing.
-    if incoming.type == TriggerType.VIEWER_EVENT and incoming.viewer:
+    # Update viewer memory for any trigger that carries a viewer field.
+    # Silent — failure here must never block the trigger from processing.
+    if incoming.viewer:
         try:
             from party.context.viewer_memory import update_viewer
             viewer_data = {}
+
+            # First chatter fields (viewer_event triggers)
             if incoming.history:
                 viewer_data.update(incoming.history)  # firsts, seconds, thirds
             if incoming.level is not None:
@@ -46,11 +48,19 @@ async def handle_message(
             if incoming.roll:
                 roll_history = viewer_data.get("roll_history", [])
                 roll_history.append(incoming.roll.get("value"))
-                viewer_data["roll_history"] = roll_history[-20:]  # keep last 20
+                viewer_data["roll_history"] = roll_history[-20:]
+
+            # Generic event data (raid, sub, gift sub — system triggers)
+            if incoming.event_data:
+                viewer_data.update(incoming.event_data)
+
             await update_viewer(incoming.viewer, viewer_data)
         except Exception as e:
-            log.warning("intake.viewer_memory_update_failed",
-                        viewer=incoming.viewer, reason=str(e))
+            log.warning(
+                "intake.viewer_memory_update_failed",
+                viewer=incoming.viewer,
+                reason=str(e),
+            )
 
     # Enrich to Trigger
     trigger = Trigger(
