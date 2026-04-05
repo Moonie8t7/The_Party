@@ -421,6 +421,49 @@ COMPANION_PROBABILITIES: dict[str, list[tuple[str, float]]] = {
 
 COMPANION_GLOBAL_CHANCE = 0.50
 
+# ── d20 personality-weighted character selection (Sprint 14b) ─────────────────
+
+# Weights reflect personality fit for each roll type.
+# Nat1: Grokthar (blunt mockery), Deepwilla (finds the failure mode interesting),
+#        Geptima (practical sympathy), Gemaux (dramatic despair), Clauven (measured disappointment)
+# Nat20: Gemaux (fortune is theatrical), Geptima (practical celebration),
+#         Grokthar (grudging respect), Clauven (analytical note), Deepwilla (probability angle)
+_D20_CHARACTER_WEIGHTS: dict[str, list[tuple[str, float]]] = {
+    "nat1": [
+        ("grokthar",  0.40),
+        ("deepwilla", 0.25),
+        ("geptima",   0.18),
+        ("gemaux",    0.12),
+        ("clauven",   0.05),
+    ],
+    "nat20": [
+        ("gemaux",    0.38),
+        ("geptima",   0.25),
+        ("grokthar",  0.20),
+        ("clauven",   0.10),
+        ("deepwilla", 0.07),
+    ],
+}
+
+
+def _select_d20_character(roll_type: str) -> str:
+    """
+    Select a single character to react to a nat1 or nat20 roll.
+    Uses personality-weighted random selection.
+    Falls back to grokthar for nat1, gemaux for nat20 if roll_type unrecognised.
+    """
+    weights = _D20_CHARACTER_WEIGHTS.get(roll_type)
+    if not weights:
+        return "grokthar" if roll_type == "nat1" else "gemaux"
+
+    names = [name for name, _ in weights]
+    probs = [prob for _, prob in weights]
+    # Normalise to sum to 1.0 in case of float drift
+    total = sum(probs)
+    normalised = [p / total for p in probs]
+
+    return random.choices(names, weights=normalised, k=1)[0]
+
 
 def detect_direct_address(text: str) -> DirectAddressResult:
     """
@@ -562,9 +605,27 @@ async def _route_with_method(trigger: Trigger) -> RouterResult:
 
     # ── SYSTEM: all characters, primary from routing ──────────────────────────
     if trigger.type == TriggerType.SYSTEM:
-        all_chars = list(CHARACTERS.keys())
-        # Use keyword routing to pick primary; rest are companions
         text_lower = trigger.text.lower()
+
+        # ── d20 fast-path: nat1/nat20 → single character, no companion ────────
+        if "natural 1" in text_lower or "natural 20" in text_lower:
+            roll_type = "nat1" if "natural 1" in text_lower else "nat20"
+            primary = _select_d20_character(roll_type)
+            log.info(
+                "router.d20_select",
+                trigger_id=trigger.trigger_id,
+                roll_type=roll_type,
+                primary=primary,
+            )
+            return RouterResult(
+                primary=[primary],
+                companions=[],
+                method=f"d20:{roll_type}",
+                mode=ExecutionMode.PARALLEL,
+            )
+
+        # Standard SYSTEM: all characters respond
+        all_chars = list(CHARACTERS.keys())
         primary = "gemaux"  # default primary for SYSTEM
         for rule in ROUTING_RULES:
             if any(kw in text_lower for kw in rule["keywords"]):

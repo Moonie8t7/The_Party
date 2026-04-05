@@ -156,3 +156,107 @@ async def test_router_system_has_all_five_speakers():
     all_chars = result.primary + result.companions
     assert len(all_chars) == 5
     assert result.mode == ExecutionMode.PARALLEL
+
+
+# ── Sprint 14b: d20 routing ───────────────────────────────────────────────────
+
+def _make_d20_trigger(text: str):
+    from party.models import Trigger, TriggerType, TriggerPriority
+    return Trigger(
+        type=TriggerType.SYSTEM,
+        text=text,
+        priority=TriggerPriority.HIGH,
+        cooldown_key=None,
+        game=None,
+        viewer="watchmoonie",
+    )
+
+
+@pytest.mark.asyncio
+async def test_nat1_routes_single_character_no_companion():
+    from party.orchestration.router import route_trigger
+    trigger = _make_d20_trigger(
+        "watchmoonie rolled a NATURAL 1! The dice have betrayed them — "
+        "the Fumble Leaderboard climbs to 14 total fumbles."
+    )
+    result = await route_trigger(trigger)
+    assert len(result.primary) == 1
+    assert result.companions == []
+    assert result.method == "d20:nat1"
+
+
+@pytest.mark.asyncio
+async def test_nat20_routes_single_character_no_companion():
+    from party.orchestration.router import route_trigger
+    trigger = _make_d20_trigger(
+        "watchmoonie rolled a NATURAL 20! Fortune favours them — "
+        "the community's critical success count rises to 13!"
+    )
+    result = await route_trigger(trigger)
+    assert len(result.primary) == 1
+    assert result.companions == []
+    assert result.method == "d20:nat20"
+
+
+@pytest.mark.asyncio
+async def test_nat1_primary_is_valid_character():
+    from party.orchestration.router import route_trigger
+    from party.models import CHARACTERS
+    trigger = _make_d20_trigger(
+        "watchmoonie rolled a NATURAL 1! The dice have betrayed them — "
+        "the Fumble Leaderboard climbs to 14 total fumbles."
+    )
+    result = await route_trigger(trigger)
+    assert result.primary[0] in CHARACTERS
+
+
+@pytest.mark.asyncio
+async def test_nat20_primary_is_valid_character():
+    from party.orchestration.router import route_trigger
+    from party.models import CHARACTERS
+    trigger = _make_d20_trigger(
+        "watchmoonie rolled a NATURAL 20! Fortune favours them — "
+        "the community's critical success count rises to 13!"
+    )
+    result = await route_trigger(trigger)
+    assert result.primary[0] in CHARACTERS
+
+
+def test_select_d20_character_nat1_returns_valid():
+    from party.orchestration.router import _select_d20_character
+    from party.models import CHARACTERS
+    for _ in range(20):
+        assert _select_d20_character("nat1") in CHARACTERS
+
+
+def test_select_d20_character_nat20_returns_valid():
+    from party.orchestration.router import _select_d20_character
+    from party.models import CHARACTERS
+    for _ in range(20):
+        assert _select_d20_character("nat20") in CHARACTERS
+
+
+def test_select_d20_character_weights_sum_correctly():
+    """Weights must normalise without error — no ZeroDivisionError."""
+    from party.orchestration.router import _D20_CHARACTER_WEIGHTS
+    for roll_type, weights in _D20_CHARACTER_WEIGHTS.items():
+        total = sum(p for _, p in weights)
+        assert total > 0, f"{roll_type} weights sum to zero"
+
+
+@pytest.mark.asyncio
+async def test_non_d20_system_trigger_still_routes_all_characters():
+    """Standard SYSTEM triggers must not be affected by the d20 fast-path."""
+    from party.orchestration.router import route_trigger
+    from party.models import Trigger, TriggerType, TriggerPriority, CHARACTERS
+    trigger = Trigger(
+        type=TriggerType.SYSTEM,
+        text="Moonie just started the stream!",
+        priority=TriggerPriority.NORMAL,
+        cooldown_key=None,
+        game=None,
+        viewer=None,
+    )
+    result = await route_trigger(trigger)
+    total_speakers = len(result.primary) + len(result.companions)
+    assert total_speakers == len(CHARACTERS)
