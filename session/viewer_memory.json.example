@@ -1,0 +1,29 @@
+{
+  "exampleviewer": {
+    "firsts": 3,
+    "seconds": 1,
+    "thirds": 0,
+    "last_seen": "2026-04-01",
+    "subscriber": true,
+    "sub_months": 6,
+    "sub_tier": "tier 1",
+    "gifted_sub": false,
+    "gift_bomber": false,
+    "last_bomb_count": 0,
+    "raider": false,
+    "last_raid_viewers": 0,
+    "level": 5,
+    "d20_rolls_total": 8,
+    "d20_nat20s": 2,
+    "d20_nat1s": 1,
+    "last_d20": 20,
+    "renown": 57,
+    "character_affinity": {
+      "clauven": 2,
+      "geptima": 4,
+      "gemaux": 1,
+      "grokthar": 3,
+      "deepwilla": 0
+    }
+  }
+}

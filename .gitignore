@@ -1,6 +1,11 @@
 .env
 logs/
+
+# Session runtime files — contain viewer PII and live stream data
 session/session_context.txt
+session/viewer_memory.json
+session/vision_log_*.txt
+
 __pycache__/
 *.pyc
 *.pyo

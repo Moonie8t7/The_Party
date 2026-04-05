@@ -118,10 +118,10 @@ async def test_router_result_primary_not_in_companions():
 
 
 @pytest.mark.asyncio
-async def test_router_execution_mode_hotkey_is_parallel():
+async def test_router_execution_mode_hotkey_is_sequential():
     trigger = make_trigger("DM Moonie died.", ttype=TriggerType.HOTKEY)
     result = await route_trigger(trigger)
-    assert result.mode == ExecutionMode.PARALLEL
+    assert result.mode == ExecutionMode.SEQUENTIAL
 
 
 @pytest.mark.asyncio

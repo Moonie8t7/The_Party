@@ -188,6 +188,36 @@ async def update_viewer(username: str, data: dict) -> None:
         log.debug("viewer_memory.updated", viewer=username)
 
 
+async def increment_character_affinity(username: str, character_name: str) -> None:
+    """
+    Increment the affinity counter for a specific character and viewer.
+    Creates the affinity dict and character entry if not present.
+    Silent on failure — affinity is enhancement, not core.
+    """
+    if not username or not character_name:
+        return
+    async with _lock:
+        _ensure_loaded()
+        key = username.lower()
+        if key not in _memory:
+            return  # Don't create a record just for affinity
+        record = _memory[key]
+        affinity = record.setdefault("character_affinity", {})
+        affinity[character_name] = affinity.get(character_name, 0) + 1
+        _write_to_disk()
+        log.debug("viewer_memory.affinity_incremented",
+                  viewer=username, character=character_name,
+                  count=affinity[character_name])
+
+
+def get_character_affinity(viewer_data: dict) -> dict[str, int]:
+    """
+    Return per-character affinity counts from a viewer record.
+    Returns empty dict if no affinity data present.
+    """
+    return viewer_data.get("character_affinity", {})
+
+
 def format_viewer_context(viewer_data: dict, username: str) -> str:
     """
     Convert a viewer's memory record into natural language for warm primary context.

@@ -24,10 +24,10 @@ says something reactive out loud, or a timed observation fires - a
 trigger reaches the orchestrator. A routing system decides which of
 us should respond. For most triggers, one of us is the Lead and one
 other may chime in as a Companion. The Lead gets full context; the
-Companion gets a compressed brief. For chat triggers, the Companion
-hears what the Lead said and builds on it. For hotkeys and events,
-both of us react to the moment simultaneously without waiting for
-each other.
+Companion gets a compressed brief and hears what the Lead said before
+responding, so they react to each other rather than the same moment
+independently. For large stream events - raids, subscriptions,
+milestones - all five of us respond at once.
 
 We also listen to Moonie's microphone directly via Whisper STT. When
 he says something worth reacting to, we filter it through a fast
@@ -85,11 +85,11 @@ Streamer.bot sends triggers via WebSocket. The overlay animates in
 OBS as a browser source.
 
 Project statistics:
-- 8,806 lines of Python across 88 modules (source + tests)
-- 1,015 lines of production HTML/CSS/JS code
-- 917 lines of prompts and character sheets across 7 files
-- 231 automated tests (100% passing)
-- Built across 14 core development sprints
+- 8,296 lines of Python across 79 modules (source + tests)
+- 518 lines of production HTML/CSS/JS (overlay browser source)
+- 922 lines of prompts and character sheets across 7 files
+- 245 automated tests (100% passing)
+- Built across 15 core development sprints
 
 Build history:
 - Character concepts and prototype began 6 March 2026

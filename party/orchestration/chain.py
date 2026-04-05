@@ -52,8 +52,8 @@ PROVIDERS = {
 # ── Budget and timeout helpers (Tasks 11.12, 11.13, 11.17, 11.18) ─────────────
 
 _BUDGET_MAP: dict[TriggerType, str] = {
-    TriggerType.HOTKEY:        "fast",
-    TriggerType.IDLE:          "fast",
+    TriggerType.HOTKEY:        "normal",   # was "fast"
+    TriggerType.IDLE:          "normal",   # was "fast"
     TriggerType.SYSTEM:        "normal",
     TriggerType.CHAT_TRIGGER:  "normal",
     TriggerType.STT:           "normal",
@@ -369,6 +369,14 @@ async def orchestrate(trigger: Trigger) -> AsyncGenerator[Any, None]:
     if result.method == "ignored_redundant":
         return
     _enforce_speaker_limits(trigger, result)
+
+    # Increment character affinity for viewer-bearing VIEWER_EVENT triggers.
+    # VIEWER_EVENT only — d20 SYSTEM triggers are already handled by the router
+    # fast-path in _select_d20_character(). A type guard here prevents double-counting
+    # when a known viewer rolls a nat1/nat20.
+    if trigger.viewer and result.primary and trigger.type == TriggerType.VIEWER_EVENT:
+        from party.context.viewer_memory import increment_character_affinity
+        await increment_character_affinity(trigger.viewer, result.primary[0])
 
     all_characters = result.primary + result.companions
     yield {

@@ -24,45 +24,48 @@ Each character is powered by a different Large Language Model, integrating Anthr
 
 ## Core Features
 
-* **Five-Model Ensemble Orchestration**: Routes responses through a cast of models (Claude Sonnet, GPT-4o, Gemini 2.5 Flash, DeepSeek, and Grok).
-* **Live Screen Reading**: Uses GPT-4o Vision in an asynchronous loop to capture bursts of gameplay frames and maintain a context description of broadcast visuals.
-* **Hardened Voice Triggers**: Utilizes a custom phonetic and fuzzy matching engine to intercept streamer speech and route triggers with high precision.
-* **Lead + Companion Architecture**: Each trigger selects a Lead character and up to one Companion. Hotkeys and events fire both simultaneously (parallel); chat triggers run sequentially so the Companion can hear and build on the Lead's response. Latency budgets (1.5s fast / 3s normal) ensure companions are dropped rather than delayed if the Lead runs slow.
-* **Autonomous Idle Interaction**: An intelligent background coordinator that monitors stream activity and triggers natural, in-character banter during idle moments (Startup, BRB, etc.).
-* **Concurrent TTS Pipelining**: ElevenLabs voice generation occurs in background worker threads. The system synthesises the audio of the following response while the current audio is playing, minimizing inter-response latency.
-* **Context Loading Efficiency**: Tiered context architecture — full warm context for the Lead, compressed brief (~40% size) for the Companion. Historical game data and vision logs compiled into the system prompt rather than message loops, lowering token consumption over long sessions.
-* **Visual Overlay**: Displays an OBS Browser Source overlay with an auto-scrolling typewriter text format, aligned statically across the character portraits.
-* **OBS Scene Awareness**: Monitors active OBS scenes (Startup, BRB, Gaming, Chat, Post Game) to adjust character conversation styles and recaps.
+* **Five-Model Ensemble Orchestration**: Routes responses through five distinct characters, each backed by a different LLM — Claude Sonnet, GPT-4o, Gemini 2.5 Flash, Grok-3, and DeepSeek Chat.
+* **Live Screen Reading**: GPT-4o Vision captures bursts of five gameplay frames every 60 seconds and maintains a running narrative of what is on screen, injected as context on every trigger.
+* **Hardened Voice Triggers**: A custom phonetic and fuzzy-matching engine intercepts streamer speech via Whisper STT and routes triggers with high precision, filtering out ambient noise and non-reactive phrases.
+* **Lead + Companion Architecture**: Each trigger selects one Lead character and up to one Companion. The Companion always runs sequentially — it receives the Lead's response before generating its own, so it reacts to what was actually said rather than the same prompt independently. Full-party SYSTEM events (raids, subs, milestones) run in parallel across all five characters. A 3-second latency budget ensures companions are dropped cleanly rather than causing delays.
+* **Per-Viewer Character Affinity**: Viewers accumulate affinity with specific characters through repeated interactions (d20 rolls, chat events). Affinity blends with base personality weights at selection time, biasing — but never overriding — which character responds to that viewer's moments.
+* **Viewer Memory and Renown**: A persistent memory store tracks each viewer's history — chatter milestones, subscription loyalty, raids, gifted subs, and d20 fate. A Renown score aggregates this into a narrative tier label (newcomer → legend) injected into character context when that viewer appears.
+* **Autonomous Idle Interaction**: A background coordinator monitors stream activity and triggers in-character banter during idle moments. Companions hear the lead's line and build on it rather than responding to the same prompt independently.
+* **Concurrent TTS Pipelining**: ElevenLabs voice generation runs in background worker threads. The next character's audio is synthesised during playback of the current one, eliminating inter-response silence.
+* **Tiered Context Architecture**: Full warm context for the Lead; a compressed brief (~40% size) for the Companion. Game data, vision logs, viewer memory, and key events are compiled into the system prompt rather than message history, keeping token consumption flat over long sessions.
+* **OBS Scene Awareness**: Monitors active OBS scenes (Startup, BRB, Gaming, Chat, Post Game) and adjusts character tone — reactive and punchy during gameplay, reflective during breaks, celebratory at stream end.
 * **Session Analytics Dashboard**: Real-time monitoring of triggers, latency, token usage, and costs via a dedicated dashboard on port `8766`.
 
 ## Architecture
 
-The orchestrator operates purely locally. It acts as a command server that **Streamer.bot** connects to via WebSockets, whilst simultaneously hosting a secondary WebSocket endpoint that the **OBS Browser Source** connects to for live visual updates.
+The orchestrator runs locally and acts as the command hub. **Streamer.bot** sends event triggers via WebSocket. The **OBS Browser Source** connects to a secondary WebSocket endpoint for live overlay updates.
 
 ```mermaid
 graph TD
     subgraph Intake Layer
         SB[Streamer.bot] --> WS(WebSocket Server)
         Mic[Streamer Mic] --> STT(Whisper STT)
-        Scene(OBS Scene Monitor) -- Context --> Chain
+        Scene(OBS Scene Monitor) -. Scene .-> Chain
+        Memory[(Viewer Memory)] -. Affinity + Renown .-> Router
+        Memory -. Viewer Context .-> Chain
     end
 
     subgraph Core Orchestration
         WS --> Queue[Priority Queue]
         STT --> Queue
         Queue --> Router{Trigger Router}
-        
-        Vision(Vision Capture Loop) -. Context .-> Chain
-        Router --> Chain[Orchestration Chain]
-        
+
+        Vision(Vision Capture Loop) -. Screen Context .-> Chain
+        Router --> Chain[Orchestration Chain\nSequential / Parallel]
+
         Chain <--> Models((5x LLM APIs))
-        Chain --> Repair[Response Formatting]
+        Chain --> Repair[Response Repair]
     end
 
     subgraph Output Layer
         Repair --> TTS[ElevenLabs Pipelining]
         Repair --> UI[Overlay Server]
-        
+
         TTS --> VoiceOut((Audio Playback))
         UI --> Overlay[OBS Browser Source]
     end

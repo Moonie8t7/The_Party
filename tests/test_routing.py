@@ -57,10 +57,10 @@ async def test_execution_mode_correct_per_trigger_type():
     """Each trigger type must map to the correct ExecutionMode."""
     cases = [
         (TriggerType.SYSTEM,       ExecutionMode.PARALLEL),
-        (TriggerType.HOTKEY,       ExecutionMode.PARALLEL),
+        (TriggerType.HOTKEY,       ExecutionMode.SEQUENTIAL),
         (TriggerType.CHAT_TRIGGER, ExecutionMode.SEQUENTIAL),
         (TriggerType.STT,          ExecutionMode.SEQUENTIAL),
-        (TriggerType.IDLE,         ExecutionMode.PARALLEL),
+        (TriggerType.IDLE,         ExecutionMode.SEQUENTIAL),
     ]
     for ttype, expected_mode in cases:
         trigger = make_trigger("DM Moonie died.", ttype=ttype)

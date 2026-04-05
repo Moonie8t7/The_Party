@@ -92,10 +92,10 @@ class RouterResult:
 
 _MODE_MAP: dict[TriggerType, ExecutionMode] = {
     TriggerType.SYSTEM:        ExecutionMode.PARALLEL,
-    TriggerType.HOTKEY:        ExecutionMode.PARALLEL,
+    TriggerType.HOTKEY:        ExecutionMode.SEQUENTIAL,  # was PARALLEL
     TriggerType.CHAT_TRIGGER:  ExecutionMode.SEQUENTIAL,
     TriggerType.STT:           ExecutionMode.SEQUENTIAL,
-    TriggerType.IDLE:          ExecutionMode.PARALLEL,
+    TriggerType.IDLE:          ExecutionMode.SEQUENTIAL,  # was PARALLEL
     TriggerType.TIMED:         ExecutionMode.SEQUENTIAL,
     TriggerType.VIEWER_EVENT:  ExecutionMode.SEQUENTIAL,
 }
@@ -428,6 +428,8 @@ COMPANION_GLOBAL_CHANCE = 0.50
 #        Geptima (practical sympathy), Gemaux (dramatic despair), Clauven (measured disappointment)
 # Nat20: Gemaux (fortune is theatrical), Geptima (practical celebration),
 #         Grokthar (grudging respect), Clauven (analytical note), Deepwilla (probability angle)
+AFFINITY_BONUS_PER_INTERACTION = 0.05
+
 _D20_CHARACTER_WEIGHTS: dict[str, list[tuple[str, float]]] = {
     "nat1": [
         ("grokthar",  0.40),
@@ -446,10 +448,10 @@ _D20_CHARACTER_WEIGHTS: dict[str, list[tuple[str, float]]] = {
 }
 
 
-def _select_d20_character(roll_type: str) -> str:
+def _select_d20_character(roll_type: str, affinity: dict[str, int] | None = None) -> str:
     """
     Select a single character to react to a nat1 or nat20 roll.
-    Uses personality-weighted random selection.
+    Blends personality weights with per-viewer affinity if provided.
     Falls back to grokthar for nat1, gemaux for nat20 if roll_type unrecognised.
     """
     weights = _D20_CHARACTER_WEIGHTS.get(roll_type)
@@ -458,7 +460,15 @@ def _select_d20_character(roll_type: str) -> str:
 
     names = [name for name, _ in weights]
     probs = [prob for _, prob in weights]
-    # Normalise to sum to 1.0 in case of float drift
+
+    # Blend affinity if provided
+    if affinity:
+        probs = [
+            p + (affinity.get(name, 0) * AFFINITY_BONUS_PER_INTERACTION)
+            for name, p in zip(names, probs)
+        ]
+
+    # Normalise
     total = sum(probs)
     normalised = [p / total for p in probs]
 
@@ -610,12 +620,29 @@ async def _route_with_method(trigger: Trigger) -> RouterResult:
         # ── d20 fast-path: nat1/nat20 → single character, no companion ────────
         if "natural 1" in text_lower or "natural 20" in text_lower:
             roll_type = "nat1" if "natural 1" in text_lower else "nat20"
-            primary = _select_d20_character(roll_type)
+
+            # Load viewer affinity if available
+            affinity = None
+            if trigger.viewer:
+                from party.context.viewer_memory import (
+                    get_viewer, get_character_affinity, increment_character_affinity,
+                )
+                viewer_data = await get_viewer(trigger.viewer)
+                if viewer_data:
+                    affinity = get_character_affinity(viewer_data)
+
+            primary = _select_d20_character(roll_type, affinity=affinity)
+
+            # Increment affinity for selected character
+            if trigger.viewer:
+                await increment_character_affinity(trigger.viewer, primary)
+
             log.info(
                 "router.d20_select",
                 trigger_id=trigger.trigger_id,
                 roll_type=roll_type,
                 primary=primary,
+                affinity_used=affinity is not None,
             )
             return RouterResult(
                 primary=[primary],
